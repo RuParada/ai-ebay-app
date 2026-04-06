@@ -31,26 +31,53 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
         try {
             const ebay = new EbayAPI();
             const sku = ean || `SKU-${Date.now()}`;
-            // 1. Создаем товар (Inventory Item) — это база для черновика
-            await ebay.createInventoryItem(sku, result);
             
-            // 2. Создаем предложение (Offer) — это делает его видимым в черновиках
+            // 0. Если ИИ выдал ключевое слово для категории, ищем класс
+            let categoryId = "360";
+            if (result.category_keyword) {
+                categoryId = await ebay.suggestCategory(result.category_keyword);
+            }
+
+            // 1. Загружаем все фото на серверы eBay (первое — главное фото товара)
+            const imageUrls = [];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const suffix = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase() || '.jpg';
+                const mimeType = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }[suffix] || 'image/jpeg';
+                const filename = `photo-${i + 1}${suffix}`;
+                try {
+                    const url = await ebay.uploadImageToEbay(file.buffer, mimeType, filename);
+                    imageUrls.push(url);
+                    console.log(`Uploaded image ${i + 1}: ${url}`);
+                } catch (uploadErr) {
+                    console.warn(`Could not upload image ${i + 1}:`, uploadErr.message);
+                }
+            }
+
+            // 2. Создаем товар (Inventory Item) с реальными фото
+            await ebay.createInventoryItem(sku, result, imageUrls);
+            
+            // 2. Создаем предложение (Offer)
             let offerId = null;
+            let listingId = null;
             let offerError = null;
             try {
-                offerId = await ebay.createOffer(sku, result);
+                offerId = await ebay.createOffer(sku, result, categoryId);
+                
+                // 3. Публикуем (Так как стоит дата в будущем, он попадет в Запланированные / Geplant)
+                listingId = await ebay.publishOffer(offerId);
             } catch (err) {
-                console.warn("Could not create Offer (missing policies, etc):", err.response ? err.response.data : err.message);
-                // We don't fail completely, because the Inventory Item WAS created successfully!
+                console.warn("Could not create/publish Offer:", err.response ? err.response.data : err.message);
                 offerError = err.response && err.response.data 
                     ? JSON.stringify(err.response.data) 
                     : err.message;
             }
 
             result.ebay = {
-                status: offerId ? 'success' : 'partial',
+                status: listingId ? 'success' : (offerId ? 'partial' : 'error'),
                 sku: sku,
                 offerId: offerId,
+                listingId: listingId,
                 warning: offerError
             };
         } catch (err) {

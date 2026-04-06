@@ -21,7 +21,10 @@ Analyze the image(s) and create a structured description in English:
 2. **short_description** (1-2 sentences) - For product card preview
 3. **full_description** (3-5 sentences) - Details, materials, features
 4. **tags** (5-10 items) - Comma-separated, for SEO and filtering
-5. **category** - Suggest the most appropriate category
+5. **category_keyword** - 1 or 2 words IN GERMAN describing the exact item type strictly for category search on eBay (e.g. "Vase", "Ölgemälde").
+6. **productart** - The product type IN GERMAN (eBay aspect "Produktart").
+7. **marke** - The brand IN GERMAN (e.g. "Markenlos", "Cisco") (eBay aspect "Marke").
+8. **estimated_price** - Calculate and estimate the EXACT highest historical price (in EUR) that this specific item (or a highly similar one) has ever been sold for on eBay. Output only a number. Example: 1500.50
 
 Respond strictly in JSON format without markdown wrapping.
 `;
