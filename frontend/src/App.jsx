@@ -5,7 +5,7 @@ const API_URL =
   import.meta.env.VITE_API_URL || 'http://localhost:8000/api/describe/'
 
 const SUPPORTED_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp'])
-const MAX_MB = 5
+const MAX_MB = 50
 
 function extOf(name) {
   const lower = (name || '').toLowerCase()
@@ -23,6 +23,71 @@ function formatUnknown(obj) {
   }
 }
 
+const processAndCompressFile = (file) => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      resolve(file)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (e) => {
+      const img = new Image()
+      img.src = e.target.result
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        const MAX_DIM = 1920
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width
+            width = MAX_DIM
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height
+            height = MAX_DIM
+          }
+        }
+
+        canvas.width = Math.round(width)
+        canvas.height = Math.round(height)
+        const ctx = canvas.getContext('2d')
+        ctx.fillStyle = "white"
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+        canvas.toBlob((blob) => {
+          if (!blob) return resolve(file)
+          if (blob.size >= file.size) return resolve(file)
+          const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          })
+          resolve(compressedFile)
+        }, 'image/jpeg', 0.85)
+      }
+      img.onerror = () => resolve(file)
+    }
+    reader.onerror = () => resolve(file)
+  })
+}
+
+const compressIfNeeded = async (files) => {
+  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+  const MAX_PER_FILE = 4 * 1024 * 1024; // 4MB
+  const MAX_TOTAL = 45 * 1024 * 1024; // 45MB
+  
+  const needsCompression = (f) => f.size > MAX_PER_FILE || totalSize > MAX_TOTAL;
+
+  return Promise.all(
+    files.map(f => needsCompression(f) ? processAndCompressFile(f) : Promise.resolve(f))
+  );
+}
+
 // Icons
 const ClipIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,10 +96,22 @@ const ClipIcon = () => (
 )
 
 const SendIcon = () => (
-  <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
+  <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
     <path fill="currentColor" fillRule="evenodd" d="M12 3a1 1 0 0 1 .7.3l8 8a1 1 0 0 1-1.4 1.4L13 6.4V20a1 1 0 1 1-2 0V6.4l-6.3 6.3a1 1 0 0 1-1.4-1.4l8-8A1 1 0 0 1 12 3Z" clipRule="evenodd"></path>
   </svg>
 )
+
+function ImageThumb({ file }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [file])
+  
+  if (!url) return null;
+  return <img src={url} alt="preview" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+}
 
 function App() {
   const [files, setFiles] = useState([])
@@ -123,8 +200,8 @@ function App() {
         </header>
       )}
       {showChat && (
-        <header className="header">
-          Antik Halle KI
+        <header className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px' }}>
+          <span>Antik Halle KI</span>
         </header>
       )}
 
@@ -155,12 +232,23 @@ function App() {
                  accept=".jpg,.jpeg,.png,.gif,.webp"
                  disabled={busy}
                  style={{ display: 'none' }}
-                 onChange={(e) => setFiles(Array.from(e.target.files))}
+                 onChange={async (e) => {
+                   setBusy(true)
+                   const selected = Array.from(e.target.files)
+                   const compressed = await compressIfNeeded(selected)
+                   setFiles(compressed)
+                   setBusy(false)
+                 }}
                />
                {files.length > 0 && (
-                 <div className="file-badge-grid" style={{ marginTop: '16px', justifyContent: 'center' }}>
-                   <div className="file-badge">
-                     {fileMeta.msg || `${files.length} file(s)`}
+                 <div style={{ marginTop: '16px' }}>
+                   <div className="file-badge-grid" style={{ justifyContent: 'center', marginBottom: '12px' }}>
+                     <div className="file-badge">
+                       {fileMeta.msg || `${files.length} file(s)`}
+                     </div>
+                   </div>
+                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                     {files.map((f, i) => <ImageThumb key={i} file={f} />)}
                    </div>
                  </div>
                )}
@@ -184,7 +272,7 @@ function App() {
               <div className="main-input-wrap">
                 <input
                   type="text"
-                  placeholder="Additional hint or description..."
+                  placeholder="Item type/name (e.g. Vase, Switch)..."
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -206,8 +294,8 @@ function App() {
               <div className="user-bubble">
                 <div><strong>SKU:</strong> {ean || 'N/A'}</div>
                 {hint && <div><strong>Hint:</strong> {hint}</div>}
-                <div style={{ opacity: 0.8, fontSize: '13px', marginTop: '4px' }}>
-                  [ Attached {files.length} image(s) ]
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                  {files.map((f, i) => <ImageThumb key={i} file={f} />)}
                 </div>
               </div>
             </div>
@@ -236,18 +324,7 @@ function App() {
                         <div className="result-value">{result.title}</div>
                       </div>
                     )}
-                    {result.short_description && (
-                      <div className="result-group">
-                        <div className="result-label">Short Description</div>
-                        <div className="result-value">{result.short_description}</div>
-                      </div>
-                    )}
-                    {result.full_description && (
-                      <div className="result-group">
-                        <div className="result-label">Full Description</div>
-                        <div className="result-value">{result.full_description}</div>
-                      </div>
-                    )}
+                    {/* Descriptions removed per request */}
                     {result.category && (
                       <div className="result-group">
                         <div className="result-label">Category</div>
@@ -311,6 +388,44 @@ function App() {
                 </div>
               </div>
             )}
+            
+            {result && !busy && (
+              <div className="large-upload-zone" style={{ margin: '40px auto 20px auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                 <button 
+                   type="button" 
+                   className="huge-upload-btn" 
+                   onClick={() => document.getElementById('chat-file-input').click()}
+                 >
+                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                     <polyline points="21 15 16 10 5 21"></polyline>
+                   </svg>
+                   <span>Add Photos</span>
+                 </button>
+                 <input
+                   id="chat-file-input"
+                   type="file"
+                   multiple
+                   accept=".jpg,.jpeg,.png,.gif,.webp"
+                   style={{ display: 'none' }}
+                   onChange={async (e) => {
+                     const selected = Array.from(e.target.files);
+                     if (selected.length > 0) {
+                         setBusy(true)
+                         const compressed = await compressIfNeeded(selected)
+                         setFiles(compressed);
+                         setResult(null);
+                         setError('');
+                         setHint('');
+                         setEan('');
+                         setBusy(false)
+                     }
+                   }}
+                 />
+              </div>
+            )}
+
             <div ref={chatEndRef}></div>
           </>
         )}
@@ -337,22 +452,10 @@ function App() {
           </div>
 
           <div className="main-input-wrap">
-            <div className="file-input-wrapper">
-              <button type="button" className="icon-btn" disabled={busy}>
-                <ClipIcon />
-              </button>
-              <input
-                type="file"
-                multiple
-                accept=".jpg,.jpeg,.png,.gif,.webp"
-                disabled={busy}
-                onChange={(e) => setFiles(Array.from(e.target.files))}
-              />
-            </div>
 
             <input
               type="text"
-              placeholder="Images..."
+              placeholder="Item type/name (e.g. Vase, Switch)..."
               value={hint}
               onChange={(e) => setHint(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -369,9 +472,14 @@ function App() {
           </div>
 
           {files.length > 0 && (
-            <div className="file-badge-grid">
-              <div className="file-badge">
-                {fileMeta.msg || `${files.length} file(s)`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+              <div className="file-badge-grid">
+                <div className="file-badge">
+                  {fileMeta.msg || `${files.length} file(s)`}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {files.map((f, i) => <ImageThumb key={i} file={f} />)}
               </div>
             </div>
           )}

@@ -219,15 +219,19 @@
 }
 
 .send-btn {
-  background: var(--text);
-  color: var(--bg);
+  background: #10b981;
+  color: white;
   opacity: 1;
-  padding: 6px;
+  padding: 14px 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
+  transition: all 0.2s ease;
+  min-width: 64px;
 }
 
 .send-btn:hover:not(:disabled) {
-  background: var(--text);
-  opacity: 0.85;
+  background: #059669;
+  transform: translateY(-1px);
 }
 
 .file-input-wrapper {

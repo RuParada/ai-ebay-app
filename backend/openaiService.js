@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 
 const MODEL_ID = process.env.MODEL_ID || "gpt-4o";
 const MAX_TOKENS = 1024;
-const MAX_IMAGE_SIZE_MB = 5;
+const MAX_IMAGE_SIZE_MB = 15;
 
 const MEDIA_TYPE_MAP = {
     ".jpg": "image/jpeg",
