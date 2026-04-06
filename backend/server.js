@@ -78,7 +78,8 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                 sku: sku,
                 offerId: offerId,
                 listingId: listingId,
-                warning: offerError
+                error: !offerId ? offerError : undefined,
+                warning: (offerId && !listingId) ? offerError : undefined
             };
         } catch (err) {
             console.error("eBay integration error:", err.response ? err.response.data : err);

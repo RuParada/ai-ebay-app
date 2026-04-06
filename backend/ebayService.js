@@ -181,21 +181,18 @@ class EbayAPI {
         return "360"; // Fallback: Kunstdrucke (valid leaf category supporting AUCTION)
     }
 
-    async uploadImageToEbay(buffer, mimeType = 'image/jpeg', filename = 'photo.jpg') {
+    async uploadImageToEbay(buffer, mimeType = 'image/jpeg', filename = 'photo.jpg', isRetry = false) {
         const token = this.accessToken;
         if (!token) throw new Error('No access token for image upload');
 
         const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-  <RequesterCredentials>
-    <eBayAuthToken>${token}</eBayAuthToken>
-  </RequesterCredentials>
   <PictureName>${filename}</PictureName>
   <PictureSet>Supersize</PictureSet>
 </UploadSiteHostedPicturesRequest>`;
 
         const form = new FormData();
-        form.append('XML', xmlRequest, { contentType: 'text/xml', filename: 'request.xml' });
+        form.append('XML Payload', xmlRequest, { contentType: 'text/xml', filename: 'request.xml' });
         form.append('image', buffer, { contentType: mimeType, filename });
 
         const headers = {
@@ -206,6 +203,7 @@ class EbayAPI {
             'X-EBAY-API-DEV-NAME': this.devId,
             'X-EBAY-API-CERT-NAME': this.certId,
             'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+            'X-EBAY-API-IAF-TOKEN': token
         };
 
         const res = await axios.post('https://api.ebay.com/ws/api.dll', form, { headers });
@@ -214,6 +212,10 @@ class EbayAPI {
 
         if (root.Ack !== 'Success' && root.Ack !== 'Warning') {
             const errMsg = root.Errors ? JSON.stringify(root.Errors) : 'Unknown upload error';
+            if (!isRetry && errMsg.includes('IAF token')) {
+                await this.refreshUserToken();
+                return this.uploadImageToEbay(buffer, mimeType, filename, true);
+            }
             throw new Error(`Image upload failed: ${errMsg}`);
         }
 
@@ -232,6 +234,8 @@ class EbayAPI {
 
         const marke = chatgptData.marke || "Markenlos";
         const produktart = chatgptData.productart || "Sonstige";
+        const modell = chatgptData.modell || "Nicht zutreffend";
+        const abteilung = chatgptData.abteilung || "Nicht zutreffend";
 
         // Use uploaded eBay images or fallback placeholder
         const finalImageUrls = imageUrls.length > 0
@@ -244,7 +248,7 @@ class EbayAPI {
                     quantity: 1
                 }
             },
-            condition: "USED_GOOD", // Used (conditionId: 3000) - mandatory for this app
+            condition: "USED_EXCELLENT", // Used (conditionId: 3000) - mandatory for this app
             product: {
                 title: title.substring(0, 80),
                 description: chatgptData.full_description || "",
@@ -252,7 +256,10 @@ class EbayAPI {
                 aspects: {
                     Marke: [marke],
                     Produktart: [produktart],
-                    Herstellernummer: [sku],
+                    Herstellernummer: ["Nicht zutreffend"],
+                    SKU: [sku],
+                    Modell: [modell],
+                    Abteilung: [abteilung],
                     Tags: tags.length ? tags : ["Keine Tags"]
                 },
                 imageUrls: finalImageUrls
@@ -299,7 +306,7 @@ class EbayAPI {
                     currency: "EUR"
                 },
                 price: {           // eBay DE requires Buy It Now price (mandatory instant payment)
-                    value: (val * 10).toFixed(2),
+                    value: (val * 1.4).toFixed(2),
                     currency: "EUR"
                 }
             },
@@ -310,9 +317,9 @@ class EbayAPI {
             listingPolicies: {
                 fulfillmentPolicyId: "250069570026",
                 paymentPolicyId: "250069489026",
-                returnPolicyId: "250069499026",
-                listingStartDate: this.getNextSunday2145ISO()
+                returnPolicyId: "250069499026"
             },
+            listingStartDate: this.getNextSunday2145ISO(),
             listingDuration: "DAYS_7",
             merchantLocationKey: "default"
         };
