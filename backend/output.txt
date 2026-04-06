@@ -1,0 +1,15 @@
+◇ injecting env (8) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Creating inventory item with SKU: TEST-SKU-1775419691995
+Inventory created successfully.
+Creating offer for SKU: TEST-SKU-1775419691995
+HTTP ERROR: {
+  "errors": [
+    {
+      "errorId": 25709,
+      "domain": "API_INVENTORY",
+      "subdomain": "Selling",
+      "category": "Request",
+      "message": "Invalid value for fulfillmentPolicyId."
+    }
+  ]
+}

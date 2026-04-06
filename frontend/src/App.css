@@ -63,20 +63,102 @@
   color: var(--text);
 }
 
-.placeholder {
+.chat-area-empty {
+  justify-content: center;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 768px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.main-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
   text-align: center;
-  opacity: 0.5;
-  margin-top: 40px;
-  font-size: 24px;
+  color: var(--text);
+}
+
+.main-subtitle {
+  font-size: 16px;
+  color: var(--text);
+  opacity: 0.6;
+  margin: 0 0 32px 0;
+  text-align: center;
+}
+
+.large-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.huge-upload-btn {
+  background: var(--input-bg);
+  border: 2px dashed var(--border);
+  border-radius: 20px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text);
+  opacity: 0.8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 300px;
+  height: 200px;
+}
+
+.huge-upload-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
+  background: var(--bubble-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  .huge-upload-btn:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+}
+
+.huge-upload-btn svg {
+  opacity: 0.7;
+}
+
+.huge-upload-btn span {
+  font-size: 18px;
   font-weight: 600;
 }
 
-.welcome-sub {
-  font-size: 15px;
-  font-weight: normal;
-  margin-top: 8px;
+.centered-input {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-radius: 24px;
+  background: var(--bg);
+  padding: 8px;
 }
 
+@media (prefers-color-scheme: dark) {
+  .centered-input {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+}
 /* Input Area */
 .input-area {
   padding: 16px;
