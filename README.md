@@ -1,58 +1,72 @@
-# Photo Description Generator
+# AntikHalleKI (AI eBay App)
 
-Python application: accepts a photo and generates a structured description for a marketplace eBay, stock photo site, or catalog via the **OpenAI API** (model configured in `config.py`).
+A Node.js application that accepts photos of items and automatically generates structured eBay listings (descriptions, titles, conditions) using the **OpenAI API**, and publishes them directly to eBay as scheduled drafts/auctions via the **eBay Inventory API**.
+
+## Features
+
+- **AI-Powered Generation**: Generates full German-language descriptions, titles, and condition assessments based on product photos.
+- **eBay Integration**: Automates the creation of eBay listings as scheduled auctions.
+- **Secure Access**: Passcode-protected interface.
+- **Modern UI**: Clean, mobile-responsive web interface to easily upload multiple photos.
 
 ## Requirements
 
-- Python 3.10+
+- Node.js 18+
 - OpenAI API Key
+- eBay Developer Account Credentials (Client ID, Client Secret, RuName)
+- Railway (or similar) for deployment (optional)
 
 ## Installation
 
+1. Clone the repository and install dependencies for the backend:
+
 ```bash
-python -m venv venv
-venv\Scripts\activate   # Windows
-# source venv/bin/activate  # Linux/macOS
-pip install -r requirements.txt
+cd backend
+npm install
 ```
 
-Create a `.env` file and specify the real API key:
+2. Inside the `/backend` directory, create a `.env` file and specify the required environment variables:
 
 ```
+# OpenAI
 OPENAI_API_KEY=sk-...
+
+# eBay API
+EBAY_APP_ID=your_client_id
+EBAY_CERT_ID=your_client_secret
+EBAY_RU_NAME=your_ru_name
+EBAY_ENVIRONMENT=PRODUCTION  # or SANDBOX
+
+# App Security
+APP_PASSCODE=your_secret_passcode
 ```
 
 ## Usage
 
-```bash
-python main.py photo.jpg
-python main.py photo.jpg --hint "leather product" --export result.json
-python main.py photo.jpg --json-out
-```
-
-Help:
+### Running Locally
 
 ```bash
-python main.py --help
+cd backend
+node server.js
 ```
+
+Or if you have a dev script configured:
+```bash
+npm run dev
+```
+
+The server will start on port 3000 (or the port defined in your environment). Access the web interface by navigating to `http://localhost:3000` in your browser.
 
 ## Project Structure
 
-| File           | Purpose                                  |
-| -------------- | ---------------------------------------- |
-| `main.py`      | CLI                                      |
-| `describer.py` | Image loading, OpenAI API call           |
-| `formatter.py` | Console output and JSON export           |
-| `config.py`    | Model, limits, system prompt             |
+| Directory/File               | Purpose                                      |
+| ---------------------------- | -------------------------------------------- |
+| `backend/server.js`          | Main Express.js application and API routes   |
+| `backend/openaiService.js`   | OpenAI API integration for image processing  |
+| `backend/ebayService.js`     | eBay API requests and inventory management   |
+| `backend/public/`            | Frontend static assets (HTML/CSS/JS)         |
+| `backend/package.json`       | Node.js dependencies and scripts             |
 
 ## Cost Estimate (Reference)
 
-Depends on the OpenAI model used (e.g. `gpt-4o`). A typical request usually costs around **~$0.003** per photo (depending on image size and response length).
-
-## Extensions (Ideas)
-
-- Batch folder processing
-- Different prompts for Amazon, Etsy, stock photos
-- Response validation via Pydantic
-- Retry mechanisms (e.g. using tenacity) and logging
-- Web application interface
+Using `gpt-4o`, a typical request costs approximately **~$0.003** to **~$0.01** per photo, depending on image resolution and response length.
