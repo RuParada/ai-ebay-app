@@ -121,6 +121,11 @@ function App() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
 
+  const [isAuthorized, setIsAuthorized] = useState(false)
+  const [authChecking, setAuthChecking] = useState(true)
+  const [passcode, setPasscode] = useState('')
+  const [authError, setAuthError] = useState('')
+
   const chatEndRef = useRef(null)
 
   useEffect(() => {
@@ -128,6 +133,61 @@ function App() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [result, busy])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('passcode');
+    if (saved) {
+      const authUrl = import.meta.env.VITE_API_URL 
+        ? import.meta.env.VITE_API_URL.replace('describe/', 'auth')
+        : 'http://localhost:8000/api/auth';
+      
+      fetch(authUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: saved })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          setIsAuthorized(true);
+        } else {
+          localStorage.removeItem('passcode');
+        }
+      })
+      .catch(e => console.error('Auth error:', e))
+      .finally(() => setAuthChecking(false));
+    } else {
+      setAuthChecking(false);
+    }
+  }, []);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthChecking(true);
+    setAuthError('');
+    try {
+      const authUrl = import.meta.env.VITE_API_URL 
+        ? import.meta.env.VITE_API_URL.replace('describe/', 'auth')
+        : 'http://localhost:8000/api/auth';
+
+      const resp = await fetch(authUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        localStorage.setItem('passcode', passcode);
+        setIsAuthorized(true);
+      } else {
+        setAuthError(data.error || 'Invalid Passcode');
+      }
+    } catch (err) {
+      setAuthError('Connection error');
+    } finally {
+      setAuthChecking(false);
+    }
+  };
 
   const fileMeta = useMemo(() => {
     if (!files || files.length === 0) return { ok: true, msg: '' }
@@ -164,11 +224,20 @@ function App() {
       }
       if (ean.trim()) fd.append('ean', ean.trim())
       if (hint.trim()) fd.append('hint', hint.trim())
+      const savedPasscode = localStorage.getItem('passcode');
+      if (savedPasscode) fd.append('passcode', savedPasscode);
 
       const resp = await fetch(API_URL, {
         method: 'POST',
         body: fd,
       })
+
+      if (resp.status === 401) {
+        localStorage.removeItem('passcode');
+        setIsAuthorized(false);
+        setBusy(false);
+        return;
+      }
 
       const data = await resp.json().catch(() => ({}))
       if (!resp.ok) {
@@ -191,6 +260,41 @@ function App() {
   }
 
   const showChat = busy || result || error
+
+  if (authChecking && !isAuthorized) {
+    return <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="loader"><div className="dot"></div><div className="dot"></div><div className="dot"></div></div>
+    </div>;
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+        <div className="auth-modal" style={{ background: '#1e1e1e', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: '8px', color: '#fff' }}>Access Restricted</h2>
+          <p style={{ color: '#a0a0a0', marginBottom: '24px', fontSize: '14px' }}>Please enter the passcode to continue</p>
+          <form onSubmit={handleAuth}>
+            <input 
+              type="password" 
+              placeholder="Enter passcode..."
+              value={passcode}
+              onChange={e => setPasscode(e.target.value)}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #333', background: '#252525', color: '#fff', marginBottom: '16px', outline: 'none' }}
+              autoFocus
+            />
+            {authError && <div style={{ color: '#ef4444', marginBottom: '16px', fontSize: '14px' }}>{authError}</div>}
+            <button 
+              type="submit" 
+              disabled={authChecking || !passcode}
+              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontWeight: 'bold', cursor: passcode ? 'pointer' : 'not-allowed', opacity: authChecking || !passcode ? 0.7 : 1 }}
+            >
+              {authChecking ? 'Verifying...' : 'Unlock'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">

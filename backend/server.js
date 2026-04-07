@@ -15,8 +15,22 @@ app.use(express.json());
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+app.post('/api/auth', (req, res) => {
+    const expectedPasscode = process.env.APP_PASSCODE;
+    if (!expectedPasscode || req.body.passcode === expectedPasscode) {
+        return res.json({ success: true });
+    }
+    return res.status(401).json({ error: "Invalid Passcode" });
+});
+
+
 app.post('/api/describe/', upload.array('file'), async (req, res) => {
     try {
+        const expectedPasscode = process.env.APP_PASSCODE;
+        if (expectedPasscode && req.body.passcode !== expectedPasscode) {
+            return res.status(401).json({ error: "Invalid Passcode" });
+        }
+
         const files = req.files;
         if (!files || files.length === 0) {
             return res.status(400).json({ error: "No files found in 'file' field" });
