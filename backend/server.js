@@ -116,6 +116,6 @@ app.post('/api/publish/', async (req, res) => {
 });
 */
 
-app.listen(port, () => {
-    console.log(`Node.js backend listening at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Node.js backend listening at http://0.0.0.0:${port}`);
 });
