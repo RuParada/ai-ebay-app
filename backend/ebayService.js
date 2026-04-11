@@ -334,23 +334,25 @@ class EbayAPI {
             startPrice = soldPrices.average * 1.05; // 5% higher than average sold
             buyItNowPrice = soldPrices.max;         // Highest sold price
             
-            // eBay requires Buy It Now to be strictly greater than start price (usually by 30% or more, but we just ensure it's higher)
-            if (buyItNowPrice <= startPrice * 1.3) {
-                buyItNowPrice = startPrice * 1.3;
+            // eBay DE requires Buy It Now to be at least 40% higher than start price
+            if (buyItNowPrice <= startPrice * 1.45) {
+                buyItNowPrice = startPrice * 1.45;
             }
         } else {
             // Apply 5% increase to AI fallback as well, based on the prompt "estimated_price" = market value.
             startPrice = startPrice * 1.05;
-            buyItNowPrice = startPrice * 1.4;
+            buyItNowPrice = startPrice * 1.45;
         }
 
         // Round to nearest integer
         startPrice = Math.round(startPrice);
         buyItNowPrice = Math.round(buyItNowPrice);
 
-        // Fallback for safety
+        // Fallback for safety (ensure it is strictly at least 40% higher even after rounding)
         if (startPrice < 1) startPrice = 1;
-        if (buyItNowPrice <= startPrice) buyItNowPrice = Math.round(startPrice * 1.3) + 1;
+        if (buyItNowPrice < Math.ceil(startPrice * 1.40)) {
+            buyItNowPrice = Math.ceil(startPrice * 1.45) + 1;
+        }
 
         const payload = {
             sku: sku,
