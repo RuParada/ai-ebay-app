@@ -275,8 +275,8 @@ class EbayAPI {
         const day = d.getDay();
         let daysToAdd = (7 - day) % 7;
 
-        // If it's already Sunday evening (e.g. past 21:00), push to next week to ensure eBay accepts it
-        if (daysToAdd === 0 && d.getHours() >= 21) {
+        // If it's already Sunday evening (e.g. past 19:00 UTC / 21:00 CEST), push to next week to ensure eBay accepts it
+        if (daysToAdd === 0 && d.getUTCHours() >= 19) {
             daysToAdd = 7;
         } else if (daysToAdd === 0) {
             daysToAdd = 7; // Always push to next week if today is Sunday, to be safe.
@@ -284,7 +284,7 @@ class EbayAPI {
         if (daysToAdd === 0) daysToAdd = 7;
 
         d.setDate(d.getDate() + daysToAdd);
-        d.setHours(21, 45, 0, 0);
+        d.setUTCHours(19, 45, 0, 0); // 19:45 UTC = 21:45 CEST (Summer time)
         return d.toISOString();
     }
 
