@@ -384,12 +384,33 @@ class EbayAPI {
             merchantLocationKey: "default"
         };
 
-        const response = await this._request("POST", endpoint, payload);
-        if (response.status === 201 || response.status === 200) {
-            return response.data.offerId;
-        } else {
-            throw new Error(`Failed to create offer: ${JSON.stringify(response.data)}`);
+        try {
+            const response = await this._request("POST", endpoint, payload);
+            if (response.status === 201 || response.status === 200) {
+                return response.data.offerId;
+            }
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.errors) {
+                const errors = error.response.data.errors;
+                const existingOfferError = errors.find((e) => e.errorId === 25002);
+                if (existingOfferError && existingOfferError.parameters) {
+                    const offerIdParam = existingOfferError.parameters.find((p) => p.name === "offerId");
+                    if (offerIdParam && offerIdParam.value) {
+                        const existingOfferId = offerIdParam.value;
+                        // Offer already exists for this SKU, so update it instead
+                        const updateEndpoint = `/sell/inventory/v1/offer/${existingOfferId}`;
+                        const updateResponse = await this._request("PUT", updateEndpoint, payload);
+                        if (updateResponse.status === 200 || updateResponse.status === 204 || updateResponse.status === 201) {
+                            return existingOfferId;
+                        }
+                    }
+                }
+            }
+            // If it's not a 25002 or PUT failed, rethrow
+            throw error;
         }
+
+        throw new Error(`Failed to create offer`);
     }
 
     async publishOffer(offerId) {
