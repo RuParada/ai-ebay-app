@@ -583,7 +583,7 @@ function App() {
             </div>
 
             <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#fff', opacity: busy ? 0.5 : 1 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
                 <input
                   type="radio"
                   name="chat_condition"
@@ -592,9 +592,9 @@ function App() {
                   onChange={(e) => setCondition(e.target.value)}
                   disabled={busy}
                 />
-                Новый товар (смотри описание)
+                Neu: Sonstige
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#fff', opacity: busy ? 0.5 : 1 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
                 <input
                   type="radio"
                   name="chat_condition"
