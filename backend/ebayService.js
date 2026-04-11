@@ -288,11 +288,69 @@ class EbayAPI {
         return d.toISOString();
     }
 
+    async searchSoldItems(keyword) {
+        if (!keyword) return null;
+        try {
+            const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.7.0&SECURITY-APPNAME=${this.appId}&RESPONSE-DATA-FORMAT=JSON&REST-PAYLOAD&keywords=${encodeURIComponent(keyword)}&itemFilter(0).name=Condition&itemFilter(0).value=3000&itemFilter(1).name=SoldItemsOnly&itemFilter(1).value=true`;
+            const response = await axios.get(url);
+            
+            const data = response.data;
+            if (data.findCompletedItemsResponse && data.findCompletedItemsResponse[0] && data.findCompletedItemsResponse[0].searchResult && data.findCompletedItemsResponse[0].searchResult[0]) {
+                const items = data.findCompletedItemsResponse[0].searchResult[0].item;
+                if (items && items.length > 0) {
+                    let total = 0;
+                    let max = 0;
+                    let count = 0;
+                    for (const item of items) {
+                        if (item.sellingStatus && item.sellingStatus[0] && item.sellingStatus[0].currentPrice && item.sellingStatus[0].currentPrice[0]) {
+                            const price = parseFloat(item.sellingStatus[0].currentPrice[0].__value__);
+                            if (!isNaN(price)) {
+                                total += price;
+                                if (price > max) max = price;
+                                count++;
+                            }
+                        }
+                    }
+                    if (count > 0) {
+                        return { average: total / count, max: max };
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch sold items:", e.message);
+        }
+        return null;
+    }
+
     async createOffer(sku, chatgptData, categoryId) {
         const endpoint = "/sell/inventory/v1/offer";
 
-        let val = Number(chatgptData.estimated_price);
-        if (isNaN(val) || val <= 0) val = 19.99;
+        let startPrice = Number(chatgptData.estimated_price) || 19.99;
+        let buyItNowPrice = startPrice * 1.4;
+
+        // Try to fetch real prices based on AI's generated search keyword
+        const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title);
+        if (soldPrices) {
+            startPrice = soldPrices.average * 1.05; // 5% higher than average sold
+            buyItNowPrice = soldPrices.max;         // Highest sold price
+            
+            // eBay requires Buy It Now to be strictly greater than start price (usually by 30% or more, but we just ensure it's higher)
+            if (buyItNowPrice <= startPrice * 1.3) {
+                buyItNowPrice = startPrice * 1.3;
+            }
+        } else {
+            // Apply 5% increase to AI fallback as well, based on the prompt "estimated_price" = market value.
+            startPrice = startPrice * 1.05;
+            buyItNowPrice = startPrice * 1.4;
+        }
+
+        // Round to nearest integer
+        startPrice = Math.round(startPrice);
+        buyItNowPrice = Math.round(buyItNowPrice);
+
+        // Fallback for safety
+        if (startPrice < 1) startPrice = 1;
+        if (buyItNowPrice <= startPrice) buyItNowPrice = Math.round(startPrice * 1.3) + 1;
 
         const payload = {
             sku: sku,
@@ -302,11 +360,11 @@ class EbayAPI {
             categoryId: categoryId || "360",
             pricingSummary: {
                 auctionStartPrice: {
-                    value: val.toFixed(2),
+                    value: startPrice.toFixed(2),
                     currency: "EUR"
                 },
                 price: {           // eBay DE requires Buy It Now price (mandatory instant payment)
-                    value: (val * 1.4).toFixed(2),
+                    value: buyItNowPrice.toFixed(2),
                     currency: "EUR"
                 }
             },

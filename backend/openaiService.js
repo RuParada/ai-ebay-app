@@ -26,7 +26,8 @@ Analyze the image(s) and create a structured description IN GERMAN:
 7. **marke** - The brand IN GERMAN (e.g. "Markenlos", "Cisco") (eBay aspect "Marke").
 8. **modell** - The model of the item IN GERMAN (e.g. "SG200-08", "Keine Angabe") (eBay aspect "Modell").
 9. **abteilung** - The department IN GERMAN (eBay aspect "Abteilung"). Usually "Herren", "Damen", "Unisex Erwachsene", or "Nicht zutreffend" for electronics/non-clothing.
-10. **estimated_price** - Estimate a reasonable and competitive STARTING AUCTION PRICE (in EUR) for this item. Instead of the highest historical price, this should be about 60-70% of the market value to attract bids. Output only a number. Example: 80.00
+10. **estimated_price** - Estimate the average market price for this USED item (in EUR) based on your extensive knowledge base. This will act as our fallback pricing. Output only a number. Example: 80.00
+11. **search_keyword** - 2 to 4 keywords to search for sold items of this exact product on eBay (e.g. "Apple iPhone 12", "Vintage Levi's 501"). Keep it optimal for an eBay search.
 
 Respond strictly in JSON format without markdown wrapping.
 `;
