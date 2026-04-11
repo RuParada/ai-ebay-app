@@ -80,7 +80,7 @@ const compressIfNeeded = async (files) => {
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   const MAX_PER_FILE = 4 * 1024 * 1024; // 4MB
   const MAX_TOTAL = 45 * 1024 * 1024; // 45MB
-  
+
   const needsCompression = (f) => f.size > MAX_PER_FILE || totalSize > MAX_TOTAL;
 
   return Promise.all(
@@ -108,7 +108,7 @@ function ImageThumb({ file }) {
     setUrl(objectUrl)
     return () => URL.revokeObjectURL(objectUrl)
   }, [file])
-  
+
   if (!url) return null;
   return <img src={url} alt="preview" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
 }
@@ -120,6 +120,7 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [condition, setCondition] = useState('USED_EXCELLENT')
 
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
@@ -137,25 +138,25 @@ function App() {
   useEffect(() => {
     const saved = localStorage.getItem('passcode');
     if (saved) {
-      const authUrl = import.meta.env.VITE_API_URL 
+      const authUrl = import.meta.env.VITE_API_URL
         ? import.meta.env.VITE_API_URL.replace('describe/', 'auth')
         : 'http://localhost:8000/api/auth';
-      
+
       fetch(authUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ passcode: saved })
       })
-      .then(r => r.json())
-      .then(data => {
-        if (data.success) {
-          setIsAuthorized(true);
-        } else {
-          localStorage.removeItem('passcode');
-        }
-      })
-      .catch(e => console.error('Auth error:', e))
-      .finally(() => setAuthChecking(false));
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            setIsAuthorized(true);
+          } else {
+            localStorage.removeItem('passcode');
+          }
+        })
+        .catch(e => console.error('Auth error:', e))
+        .finally(() => setAuthChecking(false));
     } else {
       setAuthChecking(false);
     }
@@ -166,7 +167,7 @@ function App() {
     setAuthChecking(true);
     setAuthError('');
     try {
-      const authUrl = import.meta.env.VITE_API_URL 
+      const authUrl = import.meta.env.VITE_API_URL
         ? import.meta.env.VITE_API_URL.replace('describe/', 'auth')
         : 'http://localhost:8000/api/auth';
 
@@ -224,6 +225,7 @@ function App() {
       }
       if (ean.trim()) fd.append('ean', ean.trim())
       if (hint.trim()) fd.append('hint', hint.trim())
+      fd.append('condition', condition)
       const savedPasscode = localStorage.getItem('passcode');
       if (savedPasscode) fd.append('passcode', savedPasscode);
 
@@ -274,8 +276,8 @@ function App() {
           <h2 style={{ marginBottom: '8px', color: '#fff' }}>Access Restricted</h2>
           <p style={{ color: '#a0a0a0', marginBottom: '24px', fontSize: '14px' }}>Please enter the passcode to continue</p>
           <form onSubmit={handleAuth}>
-            <input 
-              type="password" 
+            <input
+              type="password"
               placeholder="Enter passcode..."
               value={passcode}
               onChange={e => setPasscode(e.target.value)}
@@ -283,8 +285,8 @@ function App() {
               autoFocus
             />
             {authError && <div style={{ color: '#ef4444', marginBottom: '16px', fontSize: '14px' }}>{authError}</div>}
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={authChecking || !passcode}
               style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', fontWeight: 'bold', cursor: passcode ? 'pointer' : 'not-allowed', opacity: authChecking || !passcode ? 0.7 : 1 }}
             >
@@ -300,7 +302,7 @@ function App() {
     <div className="app-container">
       {!showChat && Object.keys(result || {}).length === 0 && (
         <header className="header" style={{ borderBottom: 'none', background: 'transparent' }}>
-          
+
         </header>
       )}
       {showChat && (
@@ -314,56 +316,80 @@ function App() {
           <div className="empty-state">
             <h1 className="main-title">Antik Halle KI</h1>
             <p className="main-subtitle">Attach product images to generate eBay listing</p>
-            
+
             <div className="large-upload-zone">
-               <button 
-                 type="button" 
-                 className="huge-upload-btn" 
-                 disabled={busy}
-                 onClick={() => document.getElementById('main-file-input').click()}
-               >
-                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                   <polyline points="21 15 16 10 5 21"></polyline>
-                 </svg>
-                 <span>Add Photos</span>
-               </button>
-               <input
-                 id="main-file-input"
-                 type="file"
-                 multiple
-                 accept=".jpg,.jpeg,.png,.gif,.webp"
-                 disabled={busy}
-                 style={{ display: 'none' }}
-                 onChange={async (e) => {
-                   setBusy(true)
-                   const selected = Array.from(e.target.files)
-                   const compressed = await compressIfNeeded(selected)
-                   setFiles(compressed)
-                   setBusy(false)
-                 }}
-               />
-               {files.length > 0 && (
-                 <div style={{ marginTop: '16px' }}>
-                   <div className="file-badge-grid" style={{ justifyContent: 'center', marginBottom: '12px' }}>
-                     <div className="file-badge">
-                       {fileMeta.msg || `${files.length} file(s)`}
-                     </div>
-                   </div>
-                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                     {files.map((f, i) => <ImageThumb key={i} file={f} />)}
-                   </div>
-                 </div>
-               )}
+              <button
+                type="button"
+                className="huge-upload-btn"
+                disabled={busy}
+                onClick={() => document.getElementById('main-file-input').click()}
+              >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Add Photos</span>
+              </button>
+              <input
+                id="main-file-input"
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.gif,.webp"
+                disabled={busy}
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  setBusy(true)
+                  const selected = Array.from(e.target.files)
+                  const compressed = await compressIfNeeded(selected)
+                  setFiles(compressed)
+                  setBusy(false)
+                }}
+              />
+              {files.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <div className="file-badge-grid" style={{ justifyContent: 'center', marginBottom: '12px' }}>
+                    <div className="file-badge">
+                      {fileMeta.msg || `${files.length} file(s)`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {files.map((f, i) => <ImageThumb key={i} file={f} />)}
+                  </div>
+                </div>
+              )}
             </div>
-            
+
             <div className="input-container centered-input">
               {error && (
                 <div className="error-banner">
                   {error}
                 </div>
               )}
+              <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="radio"
+                    name="main_condition"
+                    value="NEW_OTHER"
+                    checked={condition === 'NEW_OTHER'}
+                    onChange={(e) => setCondition(e.target.value)}
+                    disabled={busy}
+                  />
+                  Neu: Sonstige
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="radio"
+                    name="main_condition"
+                    value="USED_EXCELLENT"
+                    checked={condition === 'USED_EXCELLENT'}
+                    onChange={(e) => setCondition(e.target.value)}
+                    disabled={busy}
+                  />
+                  Gebraucht
+                </label>
+              </div>
               <div className="extra-inputs">
                 <input
                   type="text"
@@ -373,6 +399,7 @@ function App() {
                   disabled={busy}
                 />
               </div>
+
               <div className="main-input-wrap">
                 <input
                   type="text"
@@ -492,41 +519,41 @@ function App() {
                 </div>
               </div>
             )}
-            
+
             {result && !busy && (
               <div className="large-upload-zone" style={{ margin: '40px auto 20px auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                 <button 
-                   type="button" 
-                   className="huge-upload-btn" 
-                   onClick={() => document.getElementById('chat-file-input').click()}
-                 >
-                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                     <polyline points="21 15 16 10 5 21"></polyline>
-                   </svg>
-                   <span>Add Photos</span>
-                 </button>
-                 <input
-                   id="chat-file-input"
-                   type="file"
-                   multiple
-                   accept=".jpg,.jpeg,.png,.gif,.webp"
-                   style={{ display: 'none' }}
-                   onChange={async (e) => {
-                     const selected = Array.from(e.target.files);
-                     if (selected.length > 0) {
-                         setBusy(true)
-                         const compressed = await compressIfNeeded(selected)
-                         setFiles(compressed);
-                         setResult(null);
-                         setError('');
-                         setHint('');
-                         setEan('');
-                         setBusy(false)
-                     }
-                   }}
-                 />
+                <button
+                  type="button"
+                  className="huge-upload-btn"
+                  onClick={() => document.getElementById('chat-file-input').click()}
+                >
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>Add Photos</span>
+                </button>
+                <input
+                  id="chat-file-input"
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.gif,.webp"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const selected = Array.from(e.target.files);
+                    if (selected.length > 0) {
+                      setBusy(true)
+                      const compressed = await compressIfNeeded(selected)
+                      setFiles(compressed);
+                      setResult(null);
+                      setError('');
+                      setHint('');
+                      setEan('');
+                      setBusy(false)
+                    }
+                  }}
+                />
               </div>
             )}
 
@@ -546,47 +573,72 @@ function App() {
             )}
 
             <div className="extra-inputs">
-            <input
-              type="text"
-              placeholder="SKU (optional)"
-              value={ean}
-              onChange={(e) => setEan(e.target.value)}
-              disabled={busy}
-            />
-          </div>
+              <input
+                type="text"
+                placeholder="SKU (optional)"
+                value={ean}
+                onChange={(e) => setEan(e.target.value)}
+                disabled={busy}
+              />
+            </div>
 
-          <div className="main-input-wrap">
+            <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#fff', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="radio"
+                  name="chat_condition"
+                  value="NEW_OTHER"
+                  checked={condition === 'NEW_OTHER'}
+                  onChange={(e) => setCondition(e.target.value)}
+                  disabled={busy}
+                />
+                Новый товар (смотри описание)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#fff', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="radio"
+                  name="chat_condition"
+                  value="USED_EXCELLENT"
+                  checked={condition === 'USED_EXCELLENT'}
+                  onChange={(e) => setCondition(e.target.value)}
+                  disabled={busy}
+                />
+                Gebraucht
+              </label>
+            </div>
 
-            <input
-              type="text"
-              placeholder="Item type/name (e.g. Vase, Switch)..."
-              value={hint}
-              onChange={(e) => setHint(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={busy}
-            />
+            <div className="main-input-wrap">
 
-            <button
-              className="icon-btn send-btn"
-              onClick={onSubmit}
-              disabled={busy || files.length === 0}
-            >
-              <SendIcon />
-            </button>
-          </div>
+              <input
+                type="text"
+                placeholder="Item type/name (e.g. Vase, Switch)..."
+                value={hint}
+                onChange={(e) => setHint(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={busy}
+              />
 
-          {files.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-              <div className="file-badge-grid">
-                <div className="file-badge">
-                  {fileMeta.msg || `${files.length} file(s)`}
+              <button
+                className="icon-btn send-btn"
+                onClick={onSubmit}
+                disabled={busy || files.length === 0}
+              >
+                <SendIcon />
+              </button>
+            </div>
+
+            {files.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                <div className="file-badge-grid">
+                  <div className="file-badge">
+                    {fileMeta.msg || `${files.length} file(s)`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {files.map((f, i) => <ImageThumb key={i} file={f} />)}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {files.map((f, i) => <ImageThumb key={i} file={f} />)}
-              </div>
-            </div>
-          )}
+            )}
           </div>
         </section>
       )}

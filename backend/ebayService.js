@@ -222,7 +222,7 @@ class EbayAPI {
         return root.SiteHostedPictureDetails.FullURL;
     }
 
-    async createInventoryItem(sku, chatgptData, imageUrls = []) {
+    async createInventoryItem(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT") {
         const endpoint = `/sell/inventory/v1/inventory_item/${sku}`;
         const title = chatgptData.title || `Draft ${sku}`;
         let tags = [];
@@ -248,7 +248,7 @@ class EbayAPI {
                     quantity: 1
                 }
             },
-            condition: "USED_EXCELLENT", // Used (conditionId: 3000) - mandatory for this app
+            condition: condition, // Usually USED_EXCELLENT (3000) or NEW_OTHER (1500)
             product: {
                 title: title.substring(0, 80),
                 description: chatgptData.full_description || "",

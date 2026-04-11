@@ -38,6 +38,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
 
         const hint = (req.body.hint || "").trim();
         const ean = (req.body.ean || "").trim();
+        const condition = req.body.condition || "USED_EXCELLENT";
 
         const result = await generateDescriptionFromFiles(files, hint, ean);
         
@@ -69,7 +70,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
             }
 
             // 2. Создаем товар (Inventory Item) с реальными фото
-            await ebay.createInventoryItem(sku, result, imageUrls);
+            await ebay.createInventoryItem(sku, result, imageUrls, condition);
             
             // 2. Создаем предложение (Offer)
             let offerId = null;
