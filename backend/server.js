@@ -82,10 +82,28 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                 // 3. Публикуем (Так как стоит дата в будущем, он попадет в Запланированные / Geplant)
                 listingId = await ebay.publishOffer(offerId);
             } catch (err) {
-                console.warn("Could not create/publish Offer:", err.response ? err.response.data : err.message);
-                offerError = err.response && err.response.data 
-                    ? JSON.stringify(err.response.data) 
-                    : err.message;
+                let isConditionError = false;
+                if (err.response && err.response.data && err.response.data.errors) {
+                    isConditionError = err.response.data.errors.some(e => e.errorId === 25021);
+                }
+                
+                if (isConditionError && categoryId !== "31735") {
+                    console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
+                    try {
+                        offerId = await ebay.createOffer(sku, result, "31735");
+                        listingId = await ebay.publishOffer(offerId);
+                    } catch (retryErr) {
+                        console.warn("Retry failed:", retryErr.response ? retryErr.response.data : retryErr.message);
+                        offerError = retryErr.response && retryErr.response.data 
+                            ? JSON.stringify(retryErr.response.data) 
+                            : retryErr.message;
+                    }
+                } else {
+                    console.warn("Could not create/publish Offer:", err.response ? err.response.data : err.message);
+                    offerError = err.response && err.response.data 
+                        ? JSON.stringify(err.response.data) 
+                        : err.message;
+                }
             }
 
             result.ebay = {

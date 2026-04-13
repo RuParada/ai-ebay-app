@@ -484,9 +484,12 @@ function App() {
                         </div>
                         {result.ebay.status === 'success' && (
                           <div className="result-value" style={{ color: '#10b981', fontWeight: '500', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <span>Draft Created Successfully!</span>
+                            <span>✨ Draft Created Successfully!</span>
+                            <span style={{ fontSize: '14px', color: '#059669' }}>Please check your <b>"Scheduled" (Geplant)</b> listings on eBay!</span>
                             <span style={{ fontSize: '12px', opacity: 0.8 }}>SKU: {result.ebay.sku}</span>
-                            <span style={{ fontSize: '12px', opacity: 0.8 }}>Offer ID: {result.ebay.offerId}</span>
+                            <span style={{ fontSize: '12px', opacity: 0.8 }}>
+                              {result.ebay.listingId ? `Listing ID: ${result.ebay.listingId}` : `Offer ID: ${result.ebay.offerId}`}
+                            </span>
                           </div>
                         )}
                         {result.ebay.status === 'partial' && (
