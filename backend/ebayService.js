@@ -462,11 +462,29 @@ class EbayAPI {
                     }
                 }
                 
-                if (hasMissingSpecificError && missingSpecifics.length > 0 && extraSpecifics.length < 15) {
+                const isStuck = missingSpecifics.every(spec => {
+                    const existing = extraSpecifics.find(e => e.name === spec);
+                    return existing && existing.value === "Unbekannt";
+                });
+                
+                if (hasMissingSpecificError && missingSpecifics.length > 0 && !isStuck) {
                     console.log("Missing specifics found, retrying with: ", missingSpecifics);
                     const newExtras = [...extraSpecifics];
+                    
                     for (const spec of missingSpecifics) {
-                        newExtras.push({ name: spec, value: "Nicht zutreffend" });
+                        const existingIndex = newExtras.findIndex(e => e.name === spec);
+                        if (existingIndex === -1) {
+                            newExtras.push({ name: spec, value: "Nicht zutreffend" });
+                        } else {
+                            const prevValue = newExtras[existingIndex].value;
+                            let nextValue = "Sonstige";
+                            if (prevValue === "Nicht zutreffend") nextValue = "Sonstige";
+                            else if (prevValue === "Sonstige") nextValue = "Siehe Beschreibung";
+                            else if (prevValue === "Siehe Beschreibung") nextValue = "Keine Angabe";
+                            else nextValue = "Unbekannt";
+                            
+                            newExtras[existingIndex] = { name: spec, value: nextValue };
+                        }
                     }
                     return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras);
                 }
