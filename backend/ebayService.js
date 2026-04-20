@@ -276,7 +276,7 @@ class EbayAPI {
         return null;
     }
 
-    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360") {
+    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360", extraSpecifics = []) {
         const title = chatgptData.title || `Draft ${sku}`;
         const marke = chatgptData.marke || "Markenlos";
         const produktart = chatgptData.productart || "Sonstige";
@@ -332,6 +332,15 @@ class EbayAPI {
             if (!unsafe) return "";
             return String(unsafe).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
         };
+        
+        let extraSpecificsXml = ``;
+        for (const spec of extraSpecifics) {
+            extraSpecificsXml += `
+      <NameValueList>
+        <Name>${escapeXml(spec.name)}</Name>
+        <Value>${escapeXml(spec.value)}</Value>
+      </NameValueList>`;
+        }
 
         const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
@@ -369,7 +378,7 @@ class EbayAPI {
       <NameValueList>
         <Name>Abteilung</Name>
         <Value>${escapeXml(abteilung)}</Value>
-      </NameValueList>
+      </NameValueList>${extraSpecificsXml}
     </ItemSpecifics>
     <PictureDetails>
       <GalleryType>Gallery</GalleryType>
@@ -432,6 +441,34 @@ class EbayAPI {
                     await this.refreshUserToken();
                     headers['X-EBAY-API-IAF-TOKEN'] = this.accessToken;
                     return await executeAddItem(true);
+                }
+                
+                let errorsList = root.Errors;
+                if (!Array.isArray(errorsList)) errorsList = errorsList ? [errorsList] : [];
+                
+                let missingSpecifics = [];
+                let hasMissingSpecificError = false;
+                
+                for (const err of errorsList) {
+                    if (err && err.ErrorCode === '21919303' && err.ErrorParameters) {
+                        hasMissingSpecificError = true;
+                        let params = err.ErrorParameters;
+                        if (!Array.isArray(params)) params = [params];
+                        
+                        const param2 = params.find(p => p.$ && p.$.ParamID === '2');
+                        if (param2 && param2.Value) {
+                            missingSpecifics.push(param2.Value);
+                        }
+                    }
+                }
+                
+                if (hasMissingSpecificError && missingSpecifics.length > 0 && extraSpecifics.length < 15) {
+                    console.log("Missing specifics found, retrying with: ", missingSpecifics);
+                    const newExtras = [...extraSpecifics];
+                    for (const spec of missingSpecifics) {
+                        newExtras.push({ name: spec, value: "Nicht zutreffend" });
+                    }
+                    return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras);
                 }
                 
                 throw new Error(`Trading API AddItem failed: ${errMsg}`);
