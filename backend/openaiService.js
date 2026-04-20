@@ -27,7 +27,8 @@ Analyze the image(s) and create a structured description IN GERMAN:
 8. **modell** - The model of the item IN GERMAN (e.g. "SG200-08", "Keine Angabe") (eBay aspect "Modell").
 9. **abteilung** - The department IN GERMAN (eBay aspect "Abteilung"). Usually "Herren", "Damen", "Unisex Erwachsene", or "Nicht zutreffend" for electronics/non-clothing.
 10. **estimated_price** - Estimate the average market price for this USED item (in EUR) based on your extensive knowledge base. This will act as our fallback pricing. Output only a number. Example: 80.00
-11. **search_keyword** - 2 to 4 keywords to search for sold items of this exact product on eBay (e.g. "Apple iPhone 12", "Vintage Levi's 501"). Keep it optimal for an eBay search.
+31. **search_keyword** - 2 to 4 keywords to search for sold items of this exact product on eBay (e.g. "Apple iPhone 12", "Vintage Levi's 501"). Keep it optimal for an eBay search.
+32. **custom_specifics** - If the user specifies explicit item characteristics in the Hint (e.g. "Farbe: Schwarz", "color: black", "EU-Schuhgröße: 42"), parse them and return them as an array of objects here. Translate the key and value to German if they are not (e.g. "color" -> "Farbe"). Format: [{"name": "Farbe", "value": "Schwarz"}]. If none are given, return an empty array [].
 
 Respond strictly in JSON format without markdown wrapping.
 `;

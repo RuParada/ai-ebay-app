@@ -73,7 +73,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
             let listingId = null;
             let offerError = null;
             try {
-                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId);
+                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || []);
             } catch (err) {
                 // Condition error code in Trading API is often 21916884 or similar, but we check generically
                 let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('Condition is not applicable')); 
@@ -81,7 +81,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                 if (isConditionError && categoryId !== "31735") {
                     console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
                     try {
-                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735");
+                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735", result.custom_specifics || []);
                     } catch (retryErr) {
                         console.warn("Retry failed:", retryErr.message);
                         offerError = retryErr.message;
