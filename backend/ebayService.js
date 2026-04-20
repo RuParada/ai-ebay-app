@@ -222,53 +222,7 @@ class EbayAPI {
         return root.SiteHostedPictureDetails.FullURL;
     }
 
-    async createInventoryItem(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT") {
-        const endpoint = `/sell/inventory/v1/inventory_item/${sku}`;
-        const title = chatgptData.title || `Draft ${sku}`;
-        let tags = [];
-        if (Array.isArray(chatgptData.tags)) {
-            tags = chatgptData.tags.slice(0, 5);
-        } else {
-            tags = (chatgptData.tags || "").split(",").map(t => t.trim()).filter(Boolean).slice(0, 5);
-        }
 
-        const marke = chatgptData.marke || "Markenlos";
-        const produktart = chatgptData.productart || "Sonstige";
-        const modell = chatgptData.modell || "Nicht zutreffend";
-        const abteilung = chatgptData.abteilung || "Nicht zutreffend";
-
-        // Use uploaded eBay images or fallback placeholder
-        const finalImageUrls = imageUrls.length > 0
-            ? imageUrls.slice(0, 12) // eBay allows max 12 images
-            : ["https://i.ebayimg.com/images/g/m5EAAOSwyOFl0Mow/s-l1600.jpg"];
-
-        const payload = {
-            availability: {
-                shipToLocationAvailability: {
-                    quantity: 1
-                }
-            },
-            condition: condition, // Usually USED_EXCELLENT (3000) or NEW_OTHER (1500)
-            product: {
-                title: title.substring(0, 80),
-                description: chatgptData.full_description || "",
-                ean: ["Nicht zutreffend"],
-                aspects: {
-                    Marke: [marke],
-                    Produktart: [produktart],
-                    Herstellernummer: ["Nicht zutreffend"],
-                    SKU: [sku],
-                    Modell: [modell],
-                    Abteilung: [abteilung],
-                    Tags: tags.length ? tags : ["Keine Tags"]
-                },
-                imageUrls: finalImageUrls
-            }
-        };
-
-        const response = await this._request("PUT", endpoint, payload);
-        return response.status === 204;
-    }
 
     getNextSunday2145ISO() {
         const d = new Date();
@@ -322,105 +276,171 @@ class EbayAPI {
         return null;
     }
 
-    async createOffer(sku, chatgptData, categoryId) {
-        const endpoint = "/sell/inventory/v1/offer";
+    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360") {
+        const title = chatgptData.title || `Draft ${sku}`;
+        const marke = chatgptData.marke || "Markenlos";
+        const produktart = chatgptData.productart || "Sonstige";
+        const modell = chatgptData.modell || "Nicht zutreffend";
+        const abteilung = chatgptData.abteilung || "Nicht zutreffend";
 
+        // Condition Mapping (Sell API to Trading API)
+        let conditionID = 3000;
+        if (condition === "NEW_OTHER" || condition === "NEW") {
+            conditionID = 1500;
+        } else if (condition === "USED_GOOD" || condition === "USED_ACCEPTABLE") {
+            conditionID = 4000; // Good or Acceptable
+        } else if (condition === "USED_POOR") {
+            conditionID = 6000; // For parts or not working
+        }
+
+        // Prices
         let startPrice = Number(chatgptData.estimated_price) || 19.99;
         let buyItNowPrice = startPrice * 1.4;
-
-        // Try to fetch real prices based on AI's generated search keyword
+        
         const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title);
         if (soldPrices) {
-            startPrice = soldPrices.average * 1.05; // 5% higher than average sold
-            buyItNowPrice = soldPrices.max;         // Highest sold price
-            
-            // eBay DE requires Buy It Now to be at least 40% higher than start price
+            startPrice = soldPrices.average * 1.05;
+            buyItNowPrice = soldPrices.max;
             if (buyItNowPrice <= startPrice * 1.45) {
                 buyItNowPrice = startPrice * 1.45;
             }
         } else {
-            // Apply 5% increase to AI fallback as well, based on the prompt "estimated_price" = market value.
             startPrice = startPrice * 1.05;
             buyItNowPrice = startPrice * 1.45;
         }
 
-        // Round to nearest integer
         startPrice = Math.round(startPrice);
         buyItNowPrice = Math.round(buyItNowPrice);
 
-        // Fallback for safety (ensure it is strictly at least 40% higher even after rounding)
         if (startPrice < 1) startPrice = 1;
         if (buyItNowPrice < Math.ceil(startPrice * 1.40)) {
             buyItNowPrice = Math.ceil(startPrice * 1.45) + 1;
         }
 
-        const payload = {
-            sku: sku,
-            marketplaceId: "EBAY_DE",
-            format: "AUCTION",
-            listingDescription: chatgptData.full_description || "",
-            categoryId: categoryId || "360",
-            pricingSummary: {
-                auctionStartPrice: {
-                    value: startPrice.toFixed(2),
-                    currency: "EUR"
-                },
-                price: {           // eBay DE requires Buy It Now price (mandatory instant payment)
-                    value: buyItNowPrice.toFixed(2),
-                    currency: "EUR"
-                }
-            },
-            tax: {
-                applyTax: true,
-                vatPercentage: 19.0
-            },
-            listingPolicies: {
-                fulfillmentPolicyId: "250069570026",
-                paymentPolicyId: "250069489026",
-                returnPolicyId: "250069499026"
-            },
-            listingStartDate: this.getNextSunday2145ISO(),
-            listingDuration: "DAYS_7",
-            merchantLocationKey: "default"
+        // Pictures
+        const finalImageUrls = imageUrls.length > 0
+            ? imageUrls.slice(0, 12)
+            : ["https://i.ebayimg.com/images/g/m5EAAOSwyOFl0Mow/s-l1600.jpg"];
+            
+        let pictureDetailsXml = ``;
+        for (const url of finalImageUrls) {
+            pictureDetailsXml += `<PictureURL>${url.replace(/&/g, '&amp;')}</PictureURL>\n`;
+        }
+        
+        // Escape XML values
+        const escapeXml = (unsafe) => {
+            if (!unsafe) return "";
+            return String(unsafe).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
         };
 
-        try {
-            const response = await this._request("POST", endpoint, payload);
-            if (response.status === 201 || response.status === 200) {
-                return response.data.offerId;
-            }
-        } catch (error) {
-            if (error.response && error.response.data && error.response.data.errors) {
-                const errors = error.response.data.errors;
-                const existingOfferError = errors.find((e) => e.errorId === 25002);
-                if (existingOfferError && existingOfferError.parameters) {
-                    const offerIdParam = existingOfferError.parameters.find((p) => p.name === "offerId");
-                    if (offerIdParam && offerIdParam.value) {
-                        const existingOfferId = offerIdParam.value;
-                        // Offer already exists for this SKU, so update it instead
-                        const updateEndpoint = `/sell/inventory/v1/offer/${existingOfferId}`;
-                        const updateResponse = await this._request("PUT", updateEndpoint, payload);
-                        if (updateResponse.status === 200 || updateResponse.status === 204 || updateResponse.status === 201) {
-                            return existingOfferId;
-                        }
-                    }
+        const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
+<AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ErrorLanguage>de_DE</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <Title>${escapeXml(title).substring(0, 80)}</Title>
+    <Description><![CDATA[${chatgptData.full_description || ""}]]></Description>
+    <PrimaryCategory>
+      <CategoryID>${categoryId}</CategoryID>
+    </PrimaryCategory>
+    <StartPrice>${startPrice.toFixed(2)}</StartPrice>
+    <BuyItNowPrice>${buyItNowPrice.toFixed(2)}</BuyItNowPrice>
+    <ConditionID>${conditionID}</ConditionID>
+    <Country>DE</Country>
+    <Currency>EUR</Currency>
+    <DispatchTimeMax>3</DispatchTimeMax>
+    <ListingDuration>Days_7</ListingDuration>
+    <ListingType>Chinese</ListingType>
+    <PostalCode>10115</PostalCode>
+    <Quantity>1</Quantity>
+    <ItemSpecifics>
+      <NameValueList>
+        <Name>Marke</Name>
+        <Value>${escapeXml(marke)}</Value>
+      </NameValueList>
+      <NameValueList>
+        <Name>Produktart</Name>
+        <Value>${escapeXml(produktart)}</Value>
+      </NameValueList>
+      <NameValueList>
+        <Name>Modell</Name>
+        <Value>${escapeXml(modell)}</Value>
+      </NameValueList>
+      <NameValueList>
+        <Name>Abteilung</Name>
+        <Value>${escapeXml(abteilung)}</Value>
+      </NameValueList>
+    </ItemSpecifics>
+    <PictureDetails>
+      <GalleryType>Gallery</GalleryType>
+      ${pictureDetailsXml}
+    </PictureDetails>
+    <SellerProfiles>
+      <SellerPaymentProfile>
+        <PaymentProfileID>250069489026</PaymentProfileID>
+      </SellerPaymentProfile>
+      <SellerReturnProfile>
+        <ReturnProfileID>250069499026</ReturnProfileID>
+      </SellerReturnProfile>
+      <SellerShippingProfile>
+        <ShippingProfileID>250069570026</ShippingProfileID>
+      </SellerShippingProfile>
+    </SellerProfiles>
+    <ScheduleTime>${this.getNextSunday2145ISO()}</ScheduleTime>
+    <SKU>${escapeXml(sku)}</SKU>
+    <Site>Germany</Site>
+  </Item>
+</AddItemRequest>`;
+
+        if (!this.accessToken) {
+            await this.refreshUserToken();
+        }
+
+        let headers = {
+            'Content-Type': 'text/xml',
+            'X-EBAY-API-CALL-NAME': 'AddItem',
+            'X-EBAY-API-SITEID': '77',
+            'X-EBAY-API-APP-NAME': this.appId,
+            'X-EBAY-API-DEV-NAME': this.devId,
+            'X-EBAY-API-CERT-NAME': this.certId,
+            'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
+            'X-EBAY-API-IAF-TOKEN': this.accessToken
+        };
+
+        const executeAddItem = async (isRetry = false) => {
+            let res;
+            try {
+                res = await axios.post('https://api.ebay.com/ws/api.dll', xmlRequest, { headers });
+            } catch (error) {
+                if (error.response && error.response.status === 401 && !isRetry) {
+                    await this.refreshUserToken();
+                    headers['X-EBAY-API-IAF-TOKEN'] = this.accessToken;
+                    return await executeAddItem(true);
+                } else {
+                    throw error;
                 }
             }
-            // If it's not a 25002 or PUT failed, rethrow
-            throw error;
-        }
+            
+            const parsed = await xml2js.parseStringPromise(res.data, { explicitArray: false });
+            const root = parsed['AddItemResponse'];
 
-        throw new Error(`Failed to create offer`);
-    }
+            if (root.Ack !== 'Success' && root.Ack !== 'Warning') {
+                const errMsg = root.Errors ? JSON.stringify(root.Errors) : 'Unknown AddItem error';
+                
+                if (!isRetry && (errMsg.includes('IAF token') || errMsg.includes('IAF-Token'))) {
+                    console.log("Trading API token expired. Refreshing...");
+                    await this.refreshUserToken();
+                    headers['X-EBAY-API-IAF-TOKEN'] = this.accessToken;
+                    return await executeAddItem(true);
+                }
+                
+                throw new Error(`Trading API AddItem failed: ${errMsg}`);
+            }
 
-    async publishOffer(offerId) {
-        const endpoint = `/sell/inventory/v1/offer/${offerId}/publish`;
-        const response = await this._request("POST", endpoint);
-        if (response.status === 200) {
-            return response.data.listingId;
-        } else {
-            throw new Error(`Failed to publish offer: ${JSON.stringify(response.data)}`);
-        }
+            return typeof root.ItemID === 'string' ? root.ItemID : (root.ItemID && root.ItemID[0] ? root.ItemID[0] : root.ItemID);
+        };
+
+        return await executeAddItem();
     }
 }
 
