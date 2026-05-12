@@ -1,0 +1,58 @@
+Goal Description
+The goal is to integrate the Etsy API into the existing ai-ebay-app project so that users can publish listings to either eBay, Etsy, or both simultaneously. This requires adding target platform selection (checkboxes) to the React frontend, updating the Node.js backend to handle requests for multiple platforms, and creating a new Etsy service to interact with the Etsy API v3.
+
+User Review Required
+IMPORTANT
+
+To fully test and use the Etsy integration, you will need to provide your Etsy Developer credentials.
+
+You will need to create an app in the Etsy Developer portal and provide the following to be added to the .env file:
+
+ETSY_API_KEY (Keystring)
+ETSY_SHOP_ID (Your Etsy Shop ID)
+Similar to eBay, Etsy uses OAuth 2.0. We will build a function to generate an authentication link so you can grant the app access to your Etsy shop and obtain the initial ETSY_USER_TOKEN and ETSY_REFRESH_TOKEN.
+
+Are you ready to proceed with building the structure, or do you have these keys ready?
+
+Proposed Changes
+Frontend
+Update the React app to allow users to select which platforms to publish to.
+
+[MODIFY] 
+App.jsx
+Add state variables for publishEbay (default true) and publishEtsy (default false).
+Add two styled checkboxes in the main input area for "eBay" and "Etsy".
+Update the onSubmit function to append publishEbay and publishEtsy to the FormData sent to the backend.
+Update the result UI to show separate success/error statuses for both eBay and Etsy.
+Backend
+Add Etsy API integration and update the main server endpoint to process platform selections.
+
+[NEW] 
+etsyService.js
+Create an EtsyAPI class using Axios to interact with the Etsy API v3.
+Implement methods for:
+Generating OAuth PKCE authorization URLs.
+Exchanging authorization codes for access and refresh tokens.
+Refreshing tokens automatically.
+createDraftListing: Creating a draft listing on Etsy with the generated title, description, price, and category.
+uploadListingImage: Uploading images to the created Etsy listing.
+[MODIFY] 
+server.js
+Import EtsyAPI from etsyService.js.
+Read publishEbay and publishEtsy boolean flags from the req.body.
+If publishEbay is true, execute the existing eBay draft creation logic.
+If publishEtsy is true, execute the new Etsy draft creation logic.
+Allow both to run concurrently using Promise.allSettled to avoid one platform's failure blocking the other.
+Add an /api/etsy/auth endpoint to help facilitate the initial Etsy OAuth flow.
+[MODIFY] 
+.env
+Add placeholder variables for ETSY_API_KEY, ETSY_SHOP_ID, ETSY_USER_TOKEN, and ETSY_REFRESH_TOKEN.
+Verification Plan
+Automated Tests
+N/A - relying on manual testing with the actual APIs.
+Manual Verification
+Run the backend and frontend servers.
+Select an image, fill in the hint, and check both "eBay" and "Etsy".
+Verify the frontend sends publishEbay=true and publishEtsy=true to the backend.
+Verify the backend successfully generates the description and makes requests to both the eBay and Etsy APIs.
+Check the responses from both APIs in the UI and verify drafts are created on both platforms (once Etsy keys are configured).

@@ -121,6 +121,8 @@ function App() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [condition, setCondition] = useState('USED_EXCELLENT')
+  const [publishEbay, setPublishEbay] = useState(true)
+  const [publishEtsy, setPublishEtsy] = useState(false)
 
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
@@ -226,6 +228,8 @@ function App() {
       if (ean.trim()) fd.append('ean', ean.trim())
       if (hint.trim()) fd.append('hint', hint.trim())
       fd.append('condition', condition)
+      fd.append('publishEbay', publishEbay)
+      fd.append('publishEtsy', publishEtsy)
       const savedPasscode = localStorage.getItem('passcode');
       if (savedPasscode) fd.append('passcode', savedPasscode);
 
@@ -390,7 +394,7 @@ function App() {
                   Gebraucht
                 </label>
               </div>
-              <div className="extra-inputs">
+              <div className="extra-inputs" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
                 <input
                   type="text"
                   placeholder="SKU (optional)"
@@ -398,6 +402,24 @@ function App() {
                   onChange={(e) => setEan(e.target.value)}
                   disabled={busy}
                 />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="checkbox"
+                    checked={publishEbay}
+                    onChange={(e) => setPublishEbay(e.target.checked)}
+                    disabled={busy}
+                  />
+                  eBay
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="checkbox"
+                    checked={publishEtsy}
+                    onChange={(e) => setPublishEtsy(e.target.checked)}
+                    disabled={busy}
+                  />
+                  Etsy
+                </label>
               </div>
 
               <div className="main-input-wrap">
@@ -507,6 +529,31 @@ function App() {
                         )}
                       </div>
                     )}
+                    {result.etsy && (
+                      <div className="result-group" style={{ marginTop: '12px' }}>
+                        <div className="result-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <path d="M8 12h8"></path>
+                            <path d="M12 8v8"></path>
+                          </svg>
+                          Etsy Integration
+                        </div>
+                        {result.etsy.status === 'success' && (
+                          <div className="result-value" style={{ color: '#10b981', fontWeight: '500', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span>✨ Draft Created Successfully!</span>
+                            <span style={{ fontSize: '14px', color: '#059669' }}>Please check your Drafts on Etsy!</span>
+                            <span style={{ fontSize: '12px', opacity: 0.8 }}>Listing ID: {result.etsy.listingId}</span>
+                          </div>
+                        )}
+                        {result.etsy.status === 'error' && (
+                          <div className="result-value" style={{ color: '#ef4444', fontWeight: '500', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span>Draft Creation Failed</span>
+                            <span style={{ fontSize: '12px', opacity: 0.8 }}>{result.etsy.error}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {result._usage && (
                       <div className="usage" style={{ marginTop: '24px', opacity: 0.5, fontSize: '12px' }}>
                         tokens: in {result._usage.input_tokens} | out {result._usage.output_tokens}
@@ -575,7 +622,7 @@ function App() {
               </div>
             )}
 
-            <div className="extra-inputs">
+            <div className="extra-inputs" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
               <input
                 type="text"
                 placeholder="SKU (optional)"
@@ -583,6 +630,24 @@ function App() {
                 onChange={(e) => setEan(e.target.value)}
                 disabled={busy}
               />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="checkbox"
+                  checked={publishEbay}
+                  onChange={(e) => setPublishEbay(e.target.checked)}
+                  disabled={busy}
+                />
+                eBay
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="checkbox"
+                  checked={publishEtsy}
+                  onChange={(e) => setPublishEtsy(e.target.checked)}
+                  disabled={busy}
+                />
+                Etsy
+              </label>
             </div>
 
             <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>

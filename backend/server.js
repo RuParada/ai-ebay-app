@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const { generateDescriptionFromFiles } = require('./openaiService');
 const { EbayAPI } = require('./ebayService');
+const { EtsyAPI } = require('./etsyService');
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -23,6 +24,11 @@ app.post('/api/auth', (req, res) => {
     return res.status(401).json({ error: "Invalid Passcode" });
 });
 
+app.get('/api/etsy/auth', (req, res) => {
+    const etsy = new EtsyAPI();
+    const authData = etsy.generateAuthUrl();
+    res.json(authData);
+});
 
 app.post('/api/describe/', upload.array('file'), async (req, res) => {
     try {
@@ -40,71 +46,109 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
         const ean = (req.body.ean || "").trim();
         const condition = req.body.condition || "USED_EXCELLENT";
 
+        const publishEbay = req.body.publishEbay !== 'false';
+        const publishEtsy = req.body.publishEtsy === 'true';
+
         const result = await generateDescriptionFromFiles(files, hint, ean);
-        
-        // --- eBay Draft Creation ---
-        try {
-            const ebay = new EbayAPI();
-            const sku = ean || `SKU-${Date.now()}`;
-            
-            // 0. Если ИИ выдал ключевое слово для категории, ищем класс
-            let categoryId = "360";
-            if (result.category_keyword) {
-                categoryId = await ebay.suggestCategory(result.category_keyword);
-            }
 
-            // 1. Загружаем все фото на серверы eBay (первое — главное фото товара)
-            const imageUrls = [];
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const suffix = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase() || '.jpg';
-                const mimeType = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }[suffix] || 'image/jpeg';
-                const filename = `photo-${i + 1}${suffix}`;
+        // --- Platforms logic ---
+        const promises = [];
+
+        if (publishEbay) {
+            promises.push((async () => {
                 try {
-                    const url = await ebay.uploadImageToEbay(file.buffer, mimeType, filename);
-                    imageUrls.push(url);
-                    console.log(`Uploaded image ${i + 1}: ${url}`);
-                } catch (uploadErr) {
-                    console.warn(`Could not upload image ${i + 1}:`, uploadErr.message);
-                }
-            }
-
-            // 2. Создаем и публикуем товар через Trading API (сразу в Geplant)
-            let listingId = null;
-            let offerError = null;
-            try {
-                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || []);
-            } catch (err) {
-                // Condition error code in Trading API is often 21916884 or similar, but we check generically
-                let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('Condition is not applicable')); 
-                
-                if (isConditionError && categoryId !== "31735") {
-                    console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
-                    try {
-                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735", result.custom_specifics || []);
-                    } catch (retryErr) {
-                        console.warn("Retry failed:", retryErr.message);
-                        offerError = retryErr.message;
+                    const ebay = new EbayAPI();
+                    const sku = ean || `SKU-${Date.now()}`;
+                    
+                    let categoryId = "360";
+                    if (result.category_keyword) {
+                        categoryId = await ebay.suggestCategory(result.category_keyword);
                     }
-                } else {
-                    console.warn("Could not create Listing:", err.message);
-                    offerError = err.message;
-                }
-            }
 
-            result.ebay = {
-                status: listingId ? 'success' : 'error',
-                sku: sku,
-                listingId: listingId,
-                error: !listingId ? offerError : undefined
-            };
-        } catch (err) {
-            console.error("eBay integration error:", err.response ? err.response.data : err);
-            result.ebay = {
-                status: 'error',
-                error: err.response && err.response.data ? JSON.stringify(err.response.data) : (err.message || String(err))
-            };
+                    const imageUrls = [];
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const suffix = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase() || '.jpg';
+                        const mimeType = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }[suffix] || 'image/jpeg';
+                        const filename = `photo-${i + 1}${suffix}`;
+                        try {
+                            const url = await ebay.uploadImageToEbay(file.buffer, mimeType, filename);
+                            imageUrls.push(url);
+                        } catch (uploadErr) {
+                            console.warn(`Could not upload image ${i + 1}:`, uploadErr.message);
+                        }
+                    }
+
+                    let listingId = null;
+                    let offerError = null;
+                    try {
+                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || []);
+                    } catch (err) {
+                        let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('Condition is not applicable')); 
+                        
+                        if (isConditionError && categoryId !== "31735") {
+                            console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
+                            try {
+                                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735", result.custom_specifics || []);
+                            } catch (retryErr) {
+                                offerError = retryErr.message;
+                            }
+                        } else {
+                            offerError = err.message;
+                        }
+                    }
+
+                    result.ebay = {
+                        status: listingId ? 'success' : 'error',
+                        sku: sku,
+                        listingId: listingId,
+                        error: !listingId ? offerError : undefined
+                    };
+                } catch (err) {
+                    result.ebay = {
+                        status: 'error',
+                        error: err.response && err.response.data ? JSON.stringify(err.response.data) : (err.message || String(err))
+                    };
+                }
+            })());
         }
+
+        if (publishEtsy) {
+            promises.push((async () => {
+                try {
+                    const etsy = new EtsyAPI();
+                    const sku = ean || `SKU-${Date.now()}`;
+                    const draft = await etsy.createDraftListing(sku, result, condition);
+                    
+                    if (draft && draft.listing_id) {
+                        for (let i = 0; i < files.length; i++) {
+                            const file = files[i];
+                            const suffix = file.originalname.substring(file.originalname.lastIndexOf('.')).toLowerCase() || '.jpg';
+                            const mimeType = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' }[suffix] || 'image/jpeg';
+                            const filename = `photo-${i + 1}${suffix}`;
+                            try {
+                                await etsy.uploadListingImage(draft.listing_id, file.buffer, mimeType, filename);
+                            } catch (err) {
+                                console.warn(`Etsy image upload failed:`, err.message);
+                            }
+                        }
+                    }
+                    
+                    result.etsy = {
+                        status: 'success',
+                        sku: sku,
+                        listingId: draft.listing_id
+                    };
+                } catch (err) {
+                    result.etsy = {
+                        status: 'error',
+                        error: err.response && err.response.data ? JSON.stringify(err.response.data) : (err.message || String(err))
+                    };
+                }
+            })());
+        }
+
+        await Promise.allSettled(promises);
 
         res.json(result);
     } catch (e) {
