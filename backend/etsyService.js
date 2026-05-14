@@ -110,7 +110,7 @@ class EtsyAPI {
         let returnPolicyId;
         try {
             const returnResp = await axios.get(
-                `${this.apiUrl}/shops/${this.shopId}/return-policies`,
+                `${this.apiUrl}/shops/${this.shopId}/policies/return`,
                 { headers: await this.getHeaders() }
             );
             if (returnResp.data && returnResp.data.results && returnResp.data.results.length > 0) {
