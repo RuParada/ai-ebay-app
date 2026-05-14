@@ -84,6 +84,28 @@ class EtsyAPI {
         if (!this.accessToken) {
             throw new Error("Etsy User Token is not configured. Please complete OAuth flow.");
         }
+
+        let shippingProfileId;
+        try {
+            const profilesResp = await axios.get(
+                `${this.apiUrl}/shops/${this.shopId}/shipping-profiles`,
+                { headers: await this.getHeaders() }
+            );
+            if (profilesResp.data && profilesResp.data.results && profilesResp.data.results.length > 0) {
+                shippingProfileId = profilesResp.data.results[0].shipping_profile_id;
+            } else {
+                throw new Error("No shipping profile found on your Etsy account. Please create one on Etsy first.");
+            }
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.error === "invalid_token" && !isRetry) {
+                await this.refreshUserToken();
+                return this.createDraftListing(sku, result, condition, categoryId, true);
+            }
+            if (error.message.includes("No shipping profile found")) {
+                throw error;
+            }
+            throw new Error("Failed to fetch shipping profiles: " + (error.response ? JSON.stringify(error.response.data) : error.message));
+        }
         
         const tags = Array.isArray(result.tags) ? result.tags.slice(0, 13) : String(result.tags).split(',').map(t => t.trim()).slice(0, 13);
         const description = result.description || result.title;
@@ -98,7 +120,8 @@ class EtsyAPI {
             taxonomy_id: categoryId,
             is_supply: false,
             state: "draft",
-            tags: tags
+            tags: tags,
+            shipping_profile_id: shippingProfileId
         };
 
         try {
