@@ -106,6 +106,28 @@ class EtsyAPI {
             }
             throw new Error("Failed to fetch shipping profiles: " + (error.response ? JSON.stringify(error.response.data) : error.message));
         }
+
+        let returnPolicyId;
+        try {
+            const returnResp = await axios.get(
+                `${this.apiUrl}/shops/${this.shopId}/return-policies`,
+                { headers: await this.getHeaders() }
+            );
+            if (returnResp.data && returnResp.data.results && returnResp.data.results.length > 0) {
+                returnPolicyId = returnResp.data.results[0].return_policy_id;
+            } else {
+                throw new Error("No return policy found on your Etsy account. Please create one on Etsy first.");
+            }
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.error === "invalid_token" && !isRetry) {
+                await this.refreshUserToken();
+                return this.createDraftListing(sku, result, condition, categoryId, true);
+            }
+            if (error.message.includes("No return policy found")) {
+                throw error;
+            }
+            throw new Error("Failed to fetch return policies: " + (error.response ? JSON.stringify(error.response.data) : error.message));
+        }
         
         const tags = Array.isArray(result.tags) ? result.tags.slice(0, 13) : String(result.tags).split(',').map(t => t.trim()).slice(0, 13);
         const description = result.description || result.title;
@@ -121,7 +143,8 @@ class EtsyAPI {
             is_supply: false,
             state: "draft",
             tags: tags,
-            shipping_profile_id: shippingProfileId
+            shipping_profile_id: shippingProfileId,
+            return_policy_id: returnPolicyId
         };
 
         try {
