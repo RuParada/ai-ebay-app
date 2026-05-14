@@ -94,7 +94,7 @@ class EtsyAPI {
             description: description,
             price: 50.00, // Placeholder
             who_made: "someone_else",
-            when_made: "2020_2024",
+            when_made: "2020_2026",
             taxonomy_id: categoryId,
             is_supply: false,
             state: "draft",
