@@ -17,7 +17,7 @@ const PLATFORM_PROMPT = `
 You are a professional copywriter for an e-commerce platform.
 Analyze the image(s) and create a structured description IN GERMAN:
 
-1. **title** (up to 80 characters) - Catchy, with keywords
+1. **title** (up to 80 characters) - Catchy, with keywords. IMPORTANT: DO NOT include accessories like "Fotopapier", "Kabel", "Patrone", "Zubehör", or any bundled items in the title to comply with eBay policies. Keep the title focused strictly on the main item.
 2. **short_description** (1-2 sentences) - For product card preview
 3. **full_description** (3-5 sentences) - Details, materials, features. IMPORTANT: At the very end of this description, you MUST include a phrase like "Bitte entnehmen Sie den genauen Zustand des Artikels den beigefügten Bildern." (Please see photos for the exact condition).
 4. **tags** (5-10 items) - Comma-separated, for SEO and filtering
@@ -26,7 +26,7 @@ Analyze the image(s) and create a structured description IN GERMAN:
 7. **marke** - The brand IN GERMAN (e.g. "Markenlos", "Cisco") (eBay aspect "Marke").
 8. **modell** - The model of the item IN GERMAN (e.g. "SG200-08", "Keine Angabe") (eBay aspect "Modell").
 9. **abteilung** - The department IN GERMAN (eBay aspect "Abteilung"). Usually "Herren", "Damen", "Unisex Erwachsene", or "Nicht zutreffend" for electronics/non-clothing.
-10. **estimated_price** - Estimate the average market price for this USED item (in EUR) based on your extensive knowledge base. This will act as our fallback pricing. Output only a number. Example: 80.00
+10. **estimated_price** - Estimate the retail price of this item if it were NEW, then logically subtract between 15% and 45% depending on the brand and typical depreciation to determine a fair market price for this USED item (in EUR). Output ONLY a number. Example: 85.50
 31. **search_keyword** - 2 to 4 keywords to search for sold items of this exact product on eBay (e.g. "Apple iPhone 12", "Vintage Levi's 501"). Keep it optimal for an eBay search.
 32. **custom_specifics** - If the user specifies explicit item characteristics in the Hint (e.g. "Farbe: Schwarz", "color: black", "EU-Schuhgröße: 42"), parse them and return them as an array of objects here. Translate the key and value to German if they are not (e.g. "color" -> "Farbe"). Format: [{"name": "Farbe", "value": "Schwarz"}]. If none are given, return an empty array [].
 

@@ -151,14 +151,17 @@ class EtsyAPI {
             throw new Error("Failed to fetch readiness states: " + (error.response ? JSON.stringify(error.response.data) : error.message));
         }
         
-        const tags = Array.isArray(result.tags) ? result.tags.slice(0, 13) : String(result.tags).split(',').map(t => t.trim()).slice(0, 13);
-        const description = result.description || result.title;
+        const tags = Array.isArray(result.tags) ? result.tags.slice(0, 13) : String(result.tags || "").split(',').map(t => t.trim()).slice(0, 13);
+        const descriptionBody = result.full_description ? `${result.short_description || ''}\n\n${result.full_description}` : (result.description || result.title);
+        const description = `${descriptionBody}\n\nSKU: ${sku}`;
+        
+        const price = result.estimated_price ? parseFloat(result.estimated_price) : 50.00;
         
         const listingData = {
             quantity: 1,
             title: result.title.substring(0, 140),
             description: description,
-            price: 50.00, // Placeholder
+            price: price,
             who_made: "someone_else",
             when_made: "1990s", // Changed to vintage to allow selling items not made by the seller
             taxonomy_id: categoryId,
