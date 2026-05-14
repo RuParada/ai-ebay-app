@@ -342,6 +342,9 @@ class EbayAPI {
       </NameValueList>`;
         }
 
+        const isEan = sku && !sku.startsWith('SKU-') && /^\d{8,14}$/.test(sku);
+        const eanValue = isEan ? sku : "Nicht zutreffend";
+
         const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
 <AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <ErrorLanguage>de_DE</ErrorLanguage>
@@ -387,6 +390,9 @@ class EbayAPI {
       <GalleryType>Gallery</GalleryType>
       ${pictureDetailsXml}
     </PictureDetails>
+    <ProductListingDetails>
+      <EAN>${escapeXml(eanValue)}</EAN>
+    </ProductListingDetails>
     <SellerProfiles>
       <SellerPaymentProfile>
         <PaymentProfileID>250069489026</PaymentProfileID>
