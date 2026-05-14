@@ -128,6 +128,28 @@ class EtsyAPI {
             }
             throw new Error("Failed to fetch return policies: " + (error.response ? JSON.stringify(error.response.data) : error.message));
         }
+
+        let readinessStateId;
+        try {
+            const readinessResp = await axios.get(
+                `${this.apiUrl}/shops/${this.shopId}/readiness-state-definitions`,
+                { headers: await this.getHeaders() }
+            );
+            if (readinessResp.data && readinessResp.data.results && readinessResp.data.results.length > 0) {
+                readinessStateId = readinessResp.data.results[0].readiness_state_id;
+            } else {
+                throw new Error("No processing profile (readiness state) found on your Etsy account. Please create a shipping/processing profile on Etsy first.");
+            }
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.error === "invalid_token" && !isRetry) {
+                await this.refreshUserToken();
+                return this.createDraftListing(sku, result, condition, categoryId, true);
+            }
+            if (error.message.includes("No processing profile")) {
+                throw error;
+            }
+            throw new Error("Failed to fetch readiness states: " + (error.response ? JSON.stringify(error.response.data) : error.message));
+        }
         
         const tags = Array.isArray(result.tags) ? result.tags.slice(0, 13) : String(result.tags).split(',').map(t => t.trim()).slice(0, 13);
         const description = result.description || result.title;
@@ -144,7 +166,8 @@ class EtsyAPI {
             state: "draft",
             tags: tags,
             shipping_profile_id: shippingProfileId,
-            return_policy_id: returnPolicyId
+            return_policy_id: returnPolicyId,
+            readiness_state_id: readinessStateId
         };
 
         try {
