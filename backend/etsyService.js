@@ -166,6 +166,7 @@ class EtsyAPI {
             when_made: "1990s", // Changed to vintage to allow selling items not made by the seller
             taxonomy_id: categoryId,
             is_supply: false,
+            is_taxable: true,
             state: "draft",
             tags: tags,
             shipping_profile_id: shippingProfileId,

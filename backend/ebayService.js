@@ -357,6 +357,9 @@ class EbayAPI {
     <ConditionID>${conditionID}</ConditionID>
     <Country>DE</Country>
     <Currency>EUR</Currency>
+    <VATDetails>
+      <VATPercent>19.0</VATPercent>
+    </VATDetails>
     <DispatchTimeMax>3</DispatchTimeMax>
     <ListingDuration>Days_7</ListingDuration>
     <ListingType>Chinese</ListingType>

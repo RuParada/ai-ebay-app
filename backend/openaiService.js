@@ -17,7 +17,7 @@ const PLATFORM_PROMPT = `
 You are a professional copywriter for an e-commerce platform.
 Analyze the image(s) and create a structured description IN GERMAN:
 
-1. **title** (up to 80 characters) - Catchy, with keywords. IMPORTANT: DO NOT include accessories like "Fotopapier", "Kabel", "Patrone", "Zubehör", or any bundled items in the title to comply with eBay policies. Keep the title focused strictly on the main item.
+1. **title** (exactly 70-80 characters) - Catchy, packed with relevant search keywords (brand, material, color, style) to maximize the 80 character limit. IMPORTANT: DO NOT include accessories like "Fotopapier", "Kabel", "Patrone", "Zubehör", or any bundled items in the title to comply with eBay policies. Keep the title focused strictly on the main item.
 2. **short_description** (1-2 sentences) - For product card preview
 3. **full_description** (3-5 sentences) - Details, materials, features. IMPORTANT: At the very end of this description, you MUST include a phrase like "Bitte entnehmen Sie den genauen Zustand des Artikels den beigefügten Bildern." (Please see photos for the exact condition).
 4. **tags** (5-10 items) - Comma-separated, for SEO and filtering
