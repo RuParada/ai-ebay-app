@@ -6,8 +6,8 @@ class EtsyAPI {
     constructor() {
         this.apiKey = process.env.ETSY_API_KEY;
         this.shopId = process.env.ETSY_SHOP_ID;
-        this.accessToken = process.env.USER_TOKEN;
-        this.refreshToken = process.env.REFRESH_TOKEN;
+        this.accessToken = process.env.ETSY_USER_TOKEN || process.env.USER_TOKEN;
+        this.refreshToken = process.env.ETSY_REFRESH_TOKEN || process.env.REFRESH_TOKEN;
         this.apiUrl = 'https://openapi.etsy.com/v3/application';
     }
 
