@@ -5,6 +5,7 @@ const crypto = require('crypto');
 class EtsyAPI {
     constructor() {
         this.apiKey = process.env.ETSY_API_KEY;
+        this.sharedSecret = process.env.ETSY_SHARED_SECRET || '';
         this.shopId = process.env.ETSY_SHOP_ID;
         this.accessToken = process.env.ETSY_USER_TOKEN || process.env.USER_TOKEN;
         this.refreshToken = process.env.ETSY_REFRESH_TOKEN || process.env.REFRESH_TOKEN;
@@ -22,8 +23,9 @@ class EtsyAPI {
     }
 
     async getHeaders() {
+        const apiKeyHeader = this.sharedSecret ? `${this.apiKey}:${this.sharedSecret}` : this.apiKey;
         return {
-            'x-api-key': this.apiKey,
+            'x-api-key': apiKeyHeader,
             'Authorization': `Bearer ${this.accessToken}`
         };
     }
