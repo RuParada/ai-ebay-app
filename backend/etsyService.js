@@ -1,6 +1,29 @@
+const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 const FormData = require('form-data');
 const crypto = require('crypto');
+
+const ENV_PATH = path.join(__dirname, '..', '.env');
+
+function updateEnvFile(key, value) {
+    try {
+        let envFile = '';
+        if (fs.existsSync(ENV_PATH)) {
+            envFile = fs.readFileSync(ENV_PATH, 'utf-8');
+        }
+        const regex = new RegExp(`^${key}=.*`, 'm');
+        if (envFile.match(regex)) {
+            envFile = envFile.replace(regex, `${key}=${value}`);
+        } else {
+            envFile += `\n${key}=${value}`;
+        }
+        fs.writeFileSync(ENV_PATH, envFile);
+        process.env[key] = value;
+    } catch (e) {
+        process.env[key] = value;
+    }
+}
 
 class EtsyAPI {
     constructor() {
@@ -30,7 +53,34 @@ class EtsyAPI {
         };
     }
 
-    async createDraftListing(sku, result, condition, categoryId = 1) {
+    async refreshUserToken() {
+        if (!this.refreshToken) {
+            throw new Error("No refresh token available. User needs to re-authenticate.");
+        }
+        
+        try {
+            const response = await axios.post('https://api.etsy.com/v3/public/oauth/token', {
+                grant_type: 'refresh_token',
+                client_id: this.apiKey,
+                refresh_token: this.refreshToken
+            });
+            
+            this.accessToken = response.data.access_token;
+            this.refreshToken = response.data.refresh_token;
+            
+            updateEnvFile("ETSY_USER_TOKEN", this.accessToken);
+            updateEnvFile("ETSY_REFRESH_TOKEN", this.refreshToken);
+            
+            // Also update the non-prefixed ones just in case
+            updateEnvFile("USER_TOKEN", this.accessToken);
+            updateEnvFile("REFRESH_TOKEN", this.refreshToken);
+        } catch (error) {
+            console.error("Failed to refresh Etsy token:", error.response ? error.response.data : error.message);
+            throw new Error("Failed to refresh Etsy token: " + (error.response ? JSON.stringify(error.response.data) : error.message));
+        }
+    }
+
+    async createDraftListing(sku, result, condition, categoryId = 1, isRetry = false) {
         if (!this.accessToken) {
             throw new Error("Etsy User Token is not configured. Please complete OAuth flow.");
         }
@@ -51,31 +101,46 @@ class EtsyAPI {
             tags: tags
         };
 
-        const response = await axios.post(
-            `${this.apiUrl}/shops/${this.shopId}/listings`,
-            listingData,
-            { headers: await this.getHeaders() }
-        );
-
-        return response.data;
+        try {
+            const response = await axios.post(
+                `${this.apiUrl}/shops/${this.shopId}/listings`,
+                listingData,
+                { headers: await this.getHeaders() }
+            );
+            return response.data;
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.error === "invalid_token" && !isRetry) {
+                await this.refreshUserToken();
+                return this.createDraftListing(sku, result, condition, categoryId, true);
+            }
+            throw error;
+        }
     }
 
-    async uploadListingImage(listingId, imageBuffer, mimeType, filename) {
+    async uploadListingImage(listingId, imageBuffer, mimeType, filename, isRetry = false) {
         const formData = new FormData();
         formData.append('image', imageBuffer, { filename, contentType: mimeType });
 
         const headers = await this.getHeaders();
-        const response = await axios.post(
-            `${this.apiUrl}/shops/${this.shopId}/listings/${listingId}/images`,
-            formData,
-            {
-                headers: {
-                    ...headers,
-                    ...formData.getHeaders()
+        try {
+            const response = await axios.post(
+                `${this.apiUrl}/shops/${this.shopId}/listings/${listingId}/images`,
+                formData,
+                {
+                    headers: {
+                        ...headers,
+                        ...formData.getHeaders()
+                    }
                 }
+            );
+            return response.data;
+        } catch (error) {
+            if (error.response && error.response.data && error.response.data.error === "invalid_token" && !isRetry) {
+                await this.refreshUserToken();
+                return this.uploadListingImage(listingId, imageBuffer, mimeType, filename, true);
             }
-        );
-        return response.data;
+            throw error;
+        }
     }
 }
 
