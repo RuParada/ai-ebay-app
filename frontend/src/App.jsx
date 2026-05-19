@@ -395,13 +395,6 @@ function App() {
                 </label>
               </div>
               <div className="extra-inputs" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
-                <input
-                  type="text"
-                  placeholder="SKU (optional)"
-                  value={ean}
-                  onChange={(e) => setEan(e.target.value)}
-                  disabled={busy}
-                />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
                   <input
                     type="checkbox"
@@ -420,6 +413,13 @@ function App() {
                   />
                   Etsy
                 </label>
+                <input
+                  type="text"
+                  placeholder="SKU (optional)"
+                  value={ean}
+                  onChange={(e) => setEan(e.target.value)}
+                  disabled={busy}
+                />
               </div>
 
               <div className="main-input-wrap">
@@ -623,13 +623,6 @@ function App() {
             )}
 
             <div className="extra-inputs" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
-              <input
-                type="text"
-                placeholder="SKU (optional)"
-                value={ean}
-                onChange={(e) => setEan(e.target.value)}
-                disabled={busy}
-              />
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
                 <input
                   type="checkbox"
@@ -648,6 +641,13 @@ function App() {
                 />
                 Etsy
               </label>
+              <input
+                type="text"
+                placeholder="SKU (optional)"
+                value={ean}
+                onChange={(e) => setEan(e.target.value)}
+                disabled={busy}
+              />
             </div>
 
             <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>

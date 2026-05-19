@@ -30,6 +30,8 @@ Analyze the image(s) and create a structured description IN GERMAN:
 31. **search_keyword** - 2 to 4 keywords to search for sold items of this exact product on eBay (e.g. "Apple iPhone 12", "Vintage Levi's 501"). Keep it optimal for an eBay search.
 32. **custom_specifics** - If the user specifies explicit item characteristics in the Hint (e.g. "Farbe: Schwarz", "color: black", "EU-Schuhgröße: 42"), parse them and return them as an array of objects here. Translate the key and value to German if they are not (e.g. "color" -> "Farbe"). Format: [{"name": "Farbe", "value": "Schwarz"}]. If none are given, return an empty array [].
 
+CRITICAL RULE FOR EMPTY BOXES: If the user hint says "original box", "only box", "OVP", "Leerkarton", or implies the item is JUST THE BOX/PACKAGING, you MUST write the entire description, title, and price exclusively for the EMPTY BOX. Make it abundantly clear in the title and description that the device/product is NOT INCLUDED (e.g., "NUR OVP", "Ohne Gerät"). The estimated_price must also reflect an empty box (e.g., 5-20 EUR, not the price of the device).
+
 Respond strictly in JSON format without markdown wrapping.
 `;
 
