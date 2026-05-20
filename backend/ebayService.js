@@ -366,7 +366,8 @@ class EbayAPI {
     <DispatchTimeMax>3</DispatchTimeMax>
     <ListingDuration>Days_7</ListingDuration>
     <ListingType>Chinese</ListingType>
-    <PostalCode>10115</PostalCode>
+    <PostalCode>72070</PostalCode>
+    <Location>Tübingen, Deutschland</Location>
     <Quantity>1</Quantity>
     <ItemSpecifics>
       <NameValueList>
@@ -401,7 +402,7 @@ class EbayAPI {
         <ReturnProfileID>250069499026</ReturnProfileID>
       </SellerReturnProfile>
       <SellerShippingProfile>
-        <ShippingProfileID>250069570026</ShippingProfileID>
+        <ShippingProfileID>251223707026</ShippingProfileID>
       </SellerShippingProfile>
     </SellerProfiles>
     <ScheduleTime>${this.getNextSunday2145ISO()}</ScheduleTime>
