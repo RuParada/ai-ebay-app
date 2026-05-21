@@ -121,7 +121,9 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                                 offerError = retryErr.message;
                             }
                         } else {
-                            offerError = err.message;
+                            offerError = err.response && err.response.data 
+                                ? `${err.message}: ${JSON.stringify(err.response.data)}` 
+                                : err.message;
                         }
                     }
 
@@ -134,7 +136,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                 } catch (err) {
                     result.ebay = {
                         status: 'error',
-                        error: err.response && err.response.data ? JSON.stringify(err.response.data) : (err.message || String(err))
+                        error: err.response && err.response.data ? `${err.message}: ${JSON.stringify(err.response.data)}` : (err.message || String(err))
                     };
                 }
             })());
