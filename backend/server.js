@@ -51,6 +51,30 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
 
         const result = await generateDescriptionFromFiles(files, hint, ean);
 
+        // --- Image Enhancement Logic ---
+        try {
+            const sharp = require('sharp');
+            for (let i = 0; i < files.length; i++) {
+                // Enhance the image to make it more "sellable" (brighter, more vibrant, sharper)
+                const processedBuffer = await sharp(files[i].buffer)
+                    .modulate({
+                        brightness: 1.05, // slightly brighter
+                        saturation: 1.15  // slightly more vibrant colors
+                    })
+                    .sharpen({
+                        sigma: 1, // mild sharpening for product details
+                        m1: 1,
+                        m2: 1
+                    })
+                    .toBuffer();
+                
+                files[i].buffer = processedBuffer;
+            }
+        } catch (imgErr) {
+            console.error("Error enhancing images:", imgErr);
+            // Non-fatal, continue with original buffers if processing fails
+        }
+
         // --- Platforms logic ---
         const promises = [];
 
