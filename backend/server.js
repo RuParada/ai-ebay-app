@@ -66,9 +66,12 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                         m1: 1,
                         m2: 1
                     })
+                    .jpeg({ quality: 90 }) // enforce standard JPEG format
                     .toBuffer();
                 
                 files[i].buffer = processedBuffer;
+                files[i].originalname = files[i].originalname.replace(/\.[^/.]+$/, "") + ".jpg";
+                files[i].mimetype = "image/jpeg";
             }
         } catch (imgErr) {
             console.error("Error enhancing images:", imgErr);
