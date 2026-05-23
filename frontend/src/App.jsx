@@ -121,6 +121,7 @@ function App() {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const [condition, setCondition] = useState('USED_EXCELLENT')
+  const [listingFormat, setListingFormat] = useState('FIXED_PRICE')
   const [publishEbay, setPublishEbay] = useState(true)
   const [publishEtsy, setPublishEtsy] = useState(false)
 
@@ -228,6 +229,7 @@ function App() {
       if (ean.trim()) fd.append('ean', ean.trim())
       if (hint.trim()) fd.append('hint', hint.trim())
       fd.append('condition', condition)
+      fd.append('listingFormat', listingFormat)
       fd.append('publishEbay', publishEbay)
       fd.append('publishEtsy', publishEtsy)
       const savedPasscode = localStorage.getItem('passcode');
@@ -370,7 +372,7 @@ function App() {
                   {error}
                 </div>
               )}
-              <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>
+              <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '8px', justifyContent: 'center' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
                   <input
                     type="radio"
@@ -392,6 +394,30 @@ function App() {
                     disabled={busy}
                   />
                   Gebraucht
+                </label>
+              </div>
+              <div className="format-select" style={{ display: 'flex', gap: '20px', marginBottom: '16px', justifyContent: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="radio"
+                    name="main_format"
+                    value="AUCTION"
+                    checked={listingFormat === 'AUCTION'}
+                    onChange={(e) => setListingFormat(e.target.value)}
+                    disabled={busy}
+                  />
+                  Auktion
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgb(121 122 122)', opacity: busy ? 0.5 : 1 }}>
+                  <input
+                    type="radio"
+                    name="main_format"
+                    value="FIXED_PRICE"
+                    checked={listingFormat === 'FIXED_PRICE'}
+                    onChange={(e) => setListingFormat(e.target.value)}
+                    disabled={busy}
+                  />
+                  Sofort-kaufen
                 </label>
               </div>
               <div className="extra-inputs" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
@@ -650,7 +676,7 @@ function App() {
               />
             </div>
 
-            <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '16px', justifyContent: 'center' }}>
+            <div className="condition-select" style={{ display: 'flex', gap: '20px', marginTop: '12px', marginBottom: '8px', justifyContent: 'center' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
                 <input
                   type="radio"
@@ -672,6 +698,30 @@ function App() {
                   disabled={busy}
                 />
                 Gebraucht
+              </label>
+            </div>
+            <div className="format-select" style={{ display: 'flex', gap: '20px', marginBottom: '16px', justifyContent: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="radio"
+                  name="chat_format"
+                  value="AUCTION"
+                  checked={listingFormat === 'AUCTION'}
+                  onChange={(e) => setListingFormat(e.target.value)}
+                  disabled={busy}
+                />
+                Auktion
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#333', opacity: busy ? 0.5 : 1 }}>
+                <input
+                  type="radio"
+                  name="chat_format"
+                  value="FIXED_PRICE"
+                  checked={listingFormat === 'FIXED_PRICE'}
+                  onChange={(e) => setListingFormat(e.target.value)}
+                  disabled={busy}
+                />
+                Sofort-kaufen
               </label>
             </div>
 

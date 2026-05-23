@@ -276,7 +276,7 @@ class EbayAPI {
         return null;
     }
 
-    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360", extraSpecifics = []) {
+    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360", extraSpecifics = [], listingFormat = "FIXED_PRICE") {
         const title = chatgptData.title || `Draft ${sku}`;
         const marke = chatgptData.marke || "Markenlos";
         const produktart = chatgptData.productart || "Sonstige";
@@ -364,8 +364,8 @@ class EbayAPI {
       <VATPercent>19.0</VATPercent>
     </VATDetails>
     <DispatchTimeMax>3</DispatchTimeMax>
-    <ListingDuration>Days_7</ListingDuration>
-    <ListingType>Chinese</ListingType>
+    <ListingDuration>${listingFormat === 'AUCTION' ? 'Days_7' : 'GTC'}</ListingDuration>
+    <ListingType>${listingFormat === 'AUCTION' ? 'Chinese' : 'FixedPriceItem'}</ListingType>
     <PostalCode>72070</PostalCode>
     <Location>Tübingen, Deutschland</Location>
     <Quantity>1</Quantity>
@@ -496,7 +496,7 @@ class EbayAPI {
                             newExtras[existingIndex] = { name: spec, value: nextValue };
                         }
                     }
-                    return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras);
+                    return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras, listingFormat);
                 }
                 
                 throw new Error(`Trading API AddItem failed: ${errMsg}`);

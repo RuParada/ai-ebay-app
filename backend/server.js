@@ -45,6 +45,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
         const hint = (req.body.hint || "").trim();
         const ean = (req.body.ean || "").trim();
         const condition = req.body.condition || "USED_EXCELLENT";
+        const listingFormat = req.body.listingFormat || "FIXED_PRICE";
 
         const publishEbay = req.body.publishEbay !== 'false';
         const publishEtsy = req.body.publishEtsy === 'true';
@@ -109,14 +110,14 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                     let listingId = null;
                     let offerError = null;
                     try {
-                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || []);
+                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || [], listingFormat);
                     } catch (err) {
                         let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('Condition is not applicable')); 
                         
                         if (isConditionError && categoryId !== "31735") {
                             console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
                             try {
-                                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735", result.custom_specifics || []);
+                                listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, "31735", result.custom_specifics || [], listingFormat);
                             } catch (retryErr) {
                                 offerError = retryErr.message;
                             }
