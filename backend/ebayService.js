@@ -355,8 +355,8 @@ class EbayAPI {
     <PrimaryCategory>
       <CategoryID>${categoryId}</CategoryID>
     </PrimaryCategory>
-    <StartPrice>${startPrice.toFixed(2)}</StartPrice>
-    <BuyItNowPrice>${buyItNowPrice.toFixed(2)}</BuyItNowPrice>
+    <StartPrice>${(listingFormat === 'AUCTION' ? startPrice : buyItNowPrice).toFixed(2)}</StartPrice>
+    ${listingFormat === 'AUCTION' ? `<BuyItNowPrice>${buyItNowPrice.toFixed(2)}</BuyItNowPrice>` : ''}
     <ConditionID>${conditionID}</ConditionID>
     <Country>DE</Country>
     <Currency>EUR</Currency>
