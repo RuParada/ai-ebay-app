@@ -112,7 +112,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                     try {
                         listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || [], listingFormat);
                     } catch (err) {
-                        let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('Condition is not applicable')); 
+                        let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('21916883') || err.message.includes('Condition is not applicable') || err.message.includes('Ungültige Zustands-ID')); 
                         
                         if (isConditionError && categoryId !== "31735") {
                             console.warn(`Condition mismatch for category ${categoryId}. Retrying with generic category 31735.`);
