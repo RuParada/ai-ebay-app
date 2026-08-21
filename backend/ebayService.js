@@ -259,32 +259,57 @@ class EbayAPI {
         return d.toISOString();
     }
 
-    async searchSoldItems(keyword) {
+    async searchSoldItems(keyword, categoryId = null) {
         if (!keyword) return null;
         try {
-            const url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.7.0&SECURITY-APPNAME=${this.appId}&RESPONSE-DATA-FORMAT=JSON&REST-PAYLOAD&keywords=${encodeURIComponent(keyword)}&itemFilter(0).name=Condition&itemFilter(0).value=3000&itemFilter(1).name=SoldItemsOnly&itemFilter(1).value=true`;
+            // GLOBAL-ID=EBAY-DE forces the German site so prices come back in EUR
+            // (default is EBAY-US → USD, which was silently treated as EUR).
+            let url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.7.0&SECURITY-APPNAME=${this.appId}&GLOBAL-ID=EBAY-DE&RESPONSE-DATA-FORMAT=JSON&REST-PAYLOAD&keywords=${encodeURIComponent(keyword)}&itemFilter(0).name=Condition&itemFilter(0).value=3000&itemFilter(1).name=SoldItemsOnly&itemFilter(1).value=true&itemFilter(2).name=ListingType&itemFilter(2).value=FixedPrice&itemFilter(3).name=ListingType&itemFilter(3).value=AuctionWithBIN&itemFilter(4).name=ListingType&itemFilter(4).value=Auction&paginationInput.entriesPerPage=100&sortOrder=EndTimeSoonest`;
+            if (categoryId) {
+                url += `&categoryId=${encodeURIComponent(categoryId)}`;
+            }
             const response = await axios.get(url);
-            
+
             const data = response.data;
             if (data.findCompletedItemsResponse && data.findCompletedItemsResponse[0] && data.findCompletedItemsResponse[0].searchResult && data.findCompletedItemsResponse[0].searchResult[0]) {
                 const items = data.findCompletedItemsResponse[0].searchResult[0].item;
                 if (items && items.length > 0) {
-                    let total = 0;
-                    let max = 0;
-                    let count = 0;
+                    // Collect only EUR prices — ignore any stray non-EUR currency.
+                    let prices = [];
                     for (const item of items) {
-                        if (item.sellingStatus && item.sellingStatus[0] && item.sellingStatus[0].currentPrice && item.sellingStatus[0].currentPrice[0]) {
-                            const price = parseFloat(item.sellingStatus[0].currentPrice[0].__value__);
-                            if (!isNaN(price)) {
-                                total += price;
-                                if (price > max) max = price;
-                                count++;
-                            }
+                        const cp = item.sellingStatus && item.sellingStatus[0] && item.sellingStatus[0].currentPrice && item.sellingStatus[0].currentPrice[0];
+                        if (!cp) continue;
+                        const currency = cp["@currencyId"];
+                        if (currency && currency !== "EUR") continue;
+                        const price = parseFloat(cp.__value__);
+                        if (!isNaN(price) && price > 0) {
+                            prices.push(price);
                         }
                     }
-                    if (count > 0) {
-                        return { average: total / count, max: max };
+
+                    if (prices.length === 0) return null;
+
+                    prices.sort((a, b) => a - b);
+                    const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor((arr.length - 1) * p)))];
+
+                    // Drop outliers (top/bottom 10%) so accessories/parts/mispriced
+                    // lots don't drag the estimate. Keep everything if the sample is tiny.
+                    let core = prices;
+                    if (prices.length >= 5) {
+                        const low = pct(prices, 0.10);
+                        const high = pct(prices, 0.90);
+                        core = prices.filter(p => p >= low && p <= high);
+                        if (core.length === 0) core = prices;
                     }
+
+                    const mid = Math.floor(core.length / 2);
+                    const median = core.length % 2 === 0
+                        ? (core[mid - 1] + core[mid]) / 2
+                        : core[mid];
+                    const average = core.reduce((s, p) => s + p, 0) / core.length;
+                    const max = core[core.length - 1];
+
+                    return { average, median, max, count: core.length };
                 }
             }
         } catch (e) {
@@ -311,27 +336,40 @@ class EbayAPI {
         }
 
         // Prices
-        let startPrice = Number(chatgptData.estimated_price) || 19.99;
-        let buyItNowPrice = startPrice * 1.4;
-        
-        const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title);
-        if (soldPrices) {
-            startPrice = soldPrices.average * 1.05;
-            buyItNowPrice = soldPrices.max;
-            if (buyItNowPrice <= startPrice * 1.45) {
-                buyItNowPrice = startPrice * 1.45;
+        // aiPrice = fair market value estimated by ChatGPT (in EUR).
+        const aiPrice = Number(chatgptData.estimated_price) > 0 ? Number(chatgptData.estimated_price) : null;
+
+        // marketPrice = realistic price the item actually sells for on eBay.de.
+        // Prefer the median of real sold listings; fall back to the AI estimate.
+        let marketPrice;
+        const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title, categoryId);
+        if (soldPrices && soldPrices.count > 0) {
+            marketPrice = soldPrices.median;
+            // If we have an AI estimate, keep the sold-data median from drifting
+            // wildly off (thin/irrelevant samples): clamp to ±60% of the estimate.
+            if (aiPrice) {
+                const lower = aiPrice * 0.4;
+                const upper = aiPrice * 1.6;
+                marketPrice = Math.min(Math.max(marketPrice, lower), upper);
             }
         } else {
-            startPrice = startPrice * 1.05;
-            buyItNowPrice = startPrice * 1.45;
+            marketPrice = aiPrice || 19.99;
         }
 
-        startPrice = Math.round(startPrice);
-        buyItNowPrice = Math.round(buyItNowPrice);
+        // buyItNowPrice: the fixed / Buy-It-Now price a buyer pays now.
+        // startPrice: auction opening bid — start lower to attract bidders.
+        let buyItNowPrice = marketPrice;
+        let startPrice = listingFormat === 'AUCTION' ? marketPrice * 0.7 : marketPrice;
+
+        // Charm pricing to .99 keeps cents precision instead of rounding to whole euros.
+        const toCharm = (v) => Math.max(1, Math.floor(v)) + 0.99;
+        buyItNowPrice = toCharm(buyItNowPrice);
+        startPrice = toCharm(startPrice);
 
         if (startPrice < 1) startPrice = 1;
-        if (buyItNowPrice < Math.ceil(startPrice * 1.40)) {
-            buyItNowPrice = Math.ceil(startPrice * 1.45) + 1;
+        // For auctions the BIN must sit safely above the opening bid.
+        if (listingFormat === 'AUCTION' && buyItNowPrice < startPrice * 1.4) {
+            buyItNowPrice = toCharm(startPrice * 1.4);
         }
 
         // Pictures
