@@ -88,10 +88,13 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                     const ebay = new EbayAPI();
                     const sku = ean || `SKU-${Date.now()}`;
                     
-                    let categoryId = "360";
+                    // Get multiple category suggestions for fallback
+                    let categoryIds = ["360"];
                     if (result.category_keyword) {
-                        categoryId = await ebay.suggestCategory(result.category_keyword);
+                        categoryIds = await ebay.suggestCategories(result.category_keyword);
                     }
+                    const categoryId = categoryIds[0];
+                    const fallbackCategoryIds = categoryIds.slice(1);
 
                     const imageUrls = [];
                     for (let i = 0; i < files.length; i++) {
@@ -110,7 +113,7 @@ app.post('/api/describe/', upload.array('file'), async (req, res) => {
                     let listingId = null;
                     let offerError = null;
                     try {
-                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || [], listingFormat);
+                        listingId = await ebay.createTradingListing(sku, result, imageUrls, condition, categoryId, result.custom_specifics || [], listingFormat, fallbackCategoryIds);
                     } catch (err) {
                         let isConditionError = err.message && (err.message.includes('21916884') || err.message.includes('21916883') || err.message.includes('Condition is not applicable') || err.message.includes('Ungültige Zustands-ID')); 
                         

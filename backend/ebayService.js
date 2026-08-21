@@ -162,23 +162,40 @@ class EbayAPI {
         return axios(config);
     }
 
-    async suggestCategory(keyword) {
+    /**
+     * Returns an array of up to 5 unique category IDs from the eBay Taxonomy API.
+     * The first element is the best match; the rest are fallbacks.
+     */
+    async suggestCategories(keyword) {
         try {
             const encoded = encodeURIComponent(keyword);
             const res = await this._requestApp('GET', `/commerce/taxonomy/v1/category_tree/77/get_category_suggestions?q=${encoded}`);
             if (res.data && res.data.categorySuggestions && res.data.categorySuggestions.length > 0) {
-                // Prefer a leaf category (one that has no children) - required for AUCTION publishing
                 const suggestions = res.data.categorySuggestions;
-                const leafSuggestion = suggestions.find(s => s.category.categoryId); // all suggestions are leaves
-                if (leafSuggestion) {
-                    console.log(`Category for "${keyword}": ${leafSuggestion.category.categoryName} (${leafSuggestion.category.categoryId})`);
-                    return leafSuggestion.category.categoryId;
+                // Collect unique category IDs (max 5)
+                const seen = new Set();
+                const categoryIds = [];
+                for (const s of suggestions) {
+                    const id = s.category.categoryId;
+                    if (id && !seen.has(id)) {
+                        seen.add(id);
+                        categoryIds.push(id);
+                        console.log(`Category suggestion for "${keyword}": ${s.category.categoryName} (${id})`);
+                        if (categoryIds.length >= 5) break;
+                    }
                 }
+                if (categoryIds.length > 0) return categoryIds;
             }
         } catch (e) {
             console.error("Failed to suggest category:", e.response ? e.response.data : e.message);
         }
-        return "360"; // Fallback: Kunstdrucke (valid leaf category supporting AUCTION)
+        return ["360"]; // Fallback: generic category
+    }
+
+    // Backward-compatible wrapper: returns just the first (best) category ID
+    async suggestCategory(keyword) {
+        const categories = await this.suggestCategories(keyword);
+        return categories[0];
     }
 
     async uploadImageToEbay(buffer, mimeType = 'image/jpeg', filename = 'photo.jpg', isRetry = false) {
@@ -276,7 +293,7 @@ class EbayAPI {
         return null;
     }
 
-    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360", extraSpecifics = [], listingFormat = "FIXED_PRICE") {
+    async createTradingListing(sku, chatgptData, imageUrls = [], condition = "USED_EXCELLENT", categoryId = "360", extraSpecifics = [], listingFormat = "FIXED_PRICE", fallbackCategoryIds = []) {
         const title = chatgptData.title || `Draft ${sku}`;
         const marke = chatgptData.marke || "Markenlos";
         const produktart = chatgptData.productart || "Sonstige";
@@ -333,12 +350,18 @@ class EbayAPI {
             return String(unsafe).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
         };
         
+        // Filter out specifics with empty/whitespace-only names or values
+        const validSpecifics = extraSpecifics.filter(spec => 
+            spec.name && String(spec.name).trim().length > 0 && 
+            spec.value && String(spec.value).trim().length > 0
+        );
+        
         let extraSpecificsXml = ``;
-        for (const spec of extraSpecifics) {
+        for (const spec of validSpecifics) {
             extraSpecificsXml += `
       <NameValueList>
-        <Name>${escapeXml(spec.name)}</Name>
-        <Value>${escapeXml(spec.value)}</Value>
+        <Name>${escapeXml(String(spec.name).trim())}</Name>
+        <Value>${escapeXml(String(spec.value).trim())}</Value>
       </NameValueList>`;
         }
 
@@ -458,6 +481,7 @@ class EbayAPI {
                 
                 let missingSpecifics = [];
                 let hasMissingSpecificError = false;
+                let hasInvalidSpecificName = false;
                 
                 for (const err of errorsList) {
                     if (err && err.ErrorCode === '21919303' && err.ErrorParameters) {
@@ -465,17 +489,39 @@ class EbayAPI {
                         let params = err.ErrorParameters;
                         if (!Array.isArray(params)) params = [params];
                         
-                        const param2 = params.find(p => p.$ && p.$.ParamID === '2');
-                        if (param2 && param2.Value) {
-                            missingSpecifics.push(param2.Value);
+                        // ParamID '3' contains the actual specific name (e.g. "Geeigneter Herdtyp")
+                        // ParamID '2' only contains a numeric index
+                        const param3 = params.find(p => p.$ && p.$.ParamID === '3');
+                        if (param3 && param3.Value && String(param3.Value).trim().length > 0) {
+                            missingSpecifics.push(param3.Value);
                         }
+                    }
+                    // Error 21919306: item specific name is too short / invalid
+                    // This typically means the wrong category was picked (irrelevant specifics)
+                    if (err && err.ErrorCode === '21919306') {
+                        hasInvalidSpecificName = true;
                     }
                 }
                 
-                const isStuck = missingSpecifics.every(spec => {
+                const isStuck = missingSpecifics.length === 0 || missingSpecifics.every(spec => {
                     const existing = extraSpecifics.find(e => e.name === spec);
                     return existing && existing.value === "Unbekannt";
                 });
+                
+                // If stuck or invalid specific names detected, try a fallback category
+                if ((isStuck && hasMissingSpecificError) || hasInvalidSpecificName) {
+                    if (fallbackCategoryIds.length > 0) {
+                        const nextCategoryId = fallbackCategoryIds[0];
+                        const remainingFallbacks = fallbackCategoryIds.slice(1);
+                        console.log(`Category ${categoryId} has unresolvable specifics errors. Trying fallback category: ${nextCategoryId} (${remainingFallbacks.length} remaining)`);
+                        // Reset extraSpecifics to original custom_specifics when switching category
+                        const originalSpecifics = (chatgptData.custom_specifics || []).filter(spec => 
+                            spec.name && String(spec.name).trim().length > 0 && 
+                            spec.value && String(spec.value).trim().length > 0
+                        );
+                        return await this.createTradingListing(sku, chatgptData, imageUrls, condition, nextCategoryId, originalSpecifics, listingFormat, remainingFallbacks);
+                    }
+                }
                 
                 if (hasMissingSpecificError && missingSpecifics.length > 0 && !isStuck) {
                     console.log("Missing specifics found, retrying with: ", missingSpecifics);
@@ -496,7 +542,7 @@ class EbayAPI {
                             newExtras[existingIndex] = { name: spec, value: nextValue };
                         }
                     }
-                    return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras, listingFormat);
+                    return await this.createTradingListing(sku, chatgptData, imageUrls, condition, categoryId, newExtras, listingFormat, fallbackCategoryIds);
                 }
                 
                 throw new Error(`Trading API AddItem failed: ${errMsg}`);
