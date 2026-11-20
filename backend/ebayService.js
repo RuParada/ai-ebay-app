@@ -220,7 +220,16 @@ class EbayAPI {
         const headers = {
             ...form.getHeaders(),
             'Authorization': `Bearer ${this.accessToken}`,
+            'Accept': 'application/json',
         };
+        // Set an explicit Content-Length so the multipart body is sent with a
+        // fixed length instead of Transfer-Encoding: chunked. eBay's Akamai edge
+        // rejects chunked uploads here with a 503 "Internal Server Error - Write".
+        try {
+            headers['Content-Length'] = form.getLengthSync();
+        } catch (e) {
+            // getLengthSync only fails for stream parts; our part is a Buffer.
+        }
 
         let res;
         try {
