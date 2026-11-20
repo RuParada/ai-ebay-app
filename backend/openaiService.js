@@ -19,7 +19,10 @@ Analyze the image(s) and create a structured description IN GERMAN:
 
 1. **title** (exactly 70-80 characters) - Catchy, packed with relevant search keywords (brand, material, color, style) to maximize the 80 character limit. IMPORTANT: DO NOT include accessories like "Fotopapier", "Kabel", "Patrone", "Zubehör", or any bundled items in the title to comply with eBay policies. Keep the title focused strictly on the main item.
 2. **short_description** (1-2 sentences) - For product card preview
-3. **full_description** (3-5 sentences) - Details, materials, features. IMPORTANT: At the very end of this description, you MUST include a phrase like "Bitte entnehmen Sie den genauen Zustand des Artikels den beigefügten Bildern." (Please see photos for the exact condition).
+3. **full_description** - IN GERMAN. Write it in a plain, natural tone, like a private seller describing their own item — NOT like marketing copy. STRICT style rules: no superlatives, no sales clichés ("perfekt für", "hochwertig", "ein echter Hingucker", "ein Muss"), no emojis, no filler, no generic phrases that could apply to any product. Short, simple, factual sentences. Adapt the LENGTH and DETAIL to the type of item:
+    - If it is ELECTRONICS / IT / TECH (computers, PC components, phones, network/IT hardware, power tools, appliances, etc.): write a compact but informative description (2-4 short sentences) listing the concrete details you can actually identify — model, key technical specs (e.g. ports, capacity, speed, memory, connectivity) and notable features. State facts, not adjectives. Do not pad it out.
+    - If it is NON-TECH (coins, stamps, banknotes, antiques, collectibles, art, jewelry, décor, books, clothing, toys, etc.): keep it MINIMAL — essentially just the item's name/designation (use the provided EAN/Article number or visible labels if available), one short line. Do NOT invent materials, dates, origins or details you cannot clearly verify from the image.
+    - ALWAYS finish with this exact sentence on a new line: "Zustand und Qualität bitte den Fotos entnehmen."
 4. **tags** (5-10 items) - Comma-separated, for SEO and filtering
 5. **category_keyword** - 1 or 2 words IN GERMAN describing the exact item type strictly for category search on eBay (e.g. "Vase", "Ölgemälde").
 6. **productart** - The product type IN GERMAN (eBay aspect "Produktart").
