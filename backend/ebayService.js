@@ -198,59 +198,66 @@ class EbayAPI {
         return categories[0];
     }
 
+    // Uploads a picture to eBay Picture Services (EPS) via the Commerce Media API
+    // (createImageFromFile) and returns the EPS URL for use in <PictureURL>.
+    // Replaces the Trading API's UploadSiteHostedPictures, which eBay
+    // decommissioned on 2026-10-26 (release 1489) — it now returns 404.
+    // Requires an OAuth user token with the sell.inventory scope.
     async uploadImageToEbay(buffer, mimeType = 'image/jpeg', filename = 'photo.jpg', isRetry = false) {
-        const token = this.accessToken;
-        if (!token) throw new Error('No access token for image upload');
+        if (!this.accessToken) {
+            if (this.refreshToken) {
+                await this.refreshUserToken();
+            } else {
+                throw new Error('No access token for image upload');
+            }
+        }
 
-        const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
-<UploadSiteHostedPicturesRequest xmlns="urn:ebay:apis:eBLBaseComponents">
-  <PictureName>${filename}</PictureName>
-  <PictureSet>Supersize</PictureSet>
-</UploadSiteHostedPicturesRequest>`;
+        const mediaBase = `https://${EBAY_API_SERVER === 'api.sandbox.ebay.com' ? 'apim.sandbox.ebay.com' : 'apim.ebay.com'}/commerce/media/v1_beta`;
 
         const form = new FormData();
-        form.append('XML Payload', xmlRequest, { contentType: 'text/xml', filename: 'request.xml' });
         form.append('image', buffer, { contentType: mimeType, filename });
 
         const headers = {
             ...form.getHeaders(),
-            'X-EBAY-API-CALL-NAME': 'UploadSiteHostedPictures',
-            'X-EBAY-API-SITEID': '77',
-            'X-EBAY-API-APP-NAME': this.appId,
-            'X-EBAY-API-DEV-NAME': this.devId,
-            'X-EBAY-API-CERT-NAME': this.certId,
-            'X-EBAY-API-COMPATIBILITY-LEVEL': '967',
-            'X-EBAY-API-IAF-TOKEN': token
+            'Authorization': `Bearer ${this.accessToken}`,
         };
 
         let res;
         try {
-            res = await axios.post('https://api.ebay.com/ws/api.dll', form, {
+            res = await axios.post(`${mediaBase}/image/create_image_from_file`, form, {
                 headers,
                 maxBodyLength: Infinity,
                 maxContentLength: Infinity,
             });
         } catch (err) {
-            // Surface eBay's real explanation instead of just "status code 404"
             const status = err.response ? err.response.status : 'no-response';
-            const body = err.response && err.response.data ? String(err.response.data).slice(0, 2000) : '(empty body)';
-            const respHeaders = err.response ? JSON.stringify(err.response.headers) : '{}';
-            console.error(`[UploadSiteHostedPictures] HTTP ${status} for ${filename}\n  body: ${body}\n  resp-headers: ${respHeaders}`);
-            throw err;
-        }
-        const parsed = await xml2js.parseStringPromise(res.data, { explicitArray: false });
-        const root = parsed['UploadSiteHostedPicturesResponse'];
-
-        if (root.Ack !== 'Success' && root.Ack !== 'Warning') {
-            const errMsg = root.Errors ? JSON.stringify(root.Errors) : 'Unknown upload error';
-            if (!isRetry && errMsg.includes('IAF token')) {
+            // Token expired/invalid -> refresh once and retry
+            if (!isRetry && (status === 401 || status === 403)) {
                 await this.refreshUserToken();
                 return this.uploadImageToEbay(buffer, mimeType, filename, true);
             }
-            throw new Error(`Image upload failed: ${errMsg}`);
+            const body = err.response && err.response.data ? JSON.stringify(err.response.data).slice(0, 2000) : '(empty body)';
+            console.error(`[Media API createImageFromFile] HTTP ${status} for ${filename}\n  body: ${body}`);
+            throw new Error(`Image upload failed: HTTP ${status} ${body}`);
         }
 
-        return root.SiteHostedPictureDetails.FullURL;
+        // The EPS URL is returned directly in the response body. As a fallback
+        // for the empty-body/201 variant, follow the Location header and GET it.
+        if (res.data && res.data.imageUrl) {
+            return res.data.imageUrl;
+        }
+
+        const location = res.headers && (res.headers.location || res.headers.Location);
+        if (location) {
+            const detail = await axios.get(location, {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` },
+            });
+            if (detail.data && detail.data.imageUrl) {
+                return detail.data.imageUrl;
+            }
+        }
+
+        throw new Error(`Image upload succeeded but no imageUrl returned (status ${res.status})`);
     }
 
 
