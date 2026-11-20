@@ -289,29 +289,45 @@ class EbayAPI {
         return d.toISOString();
     }
 
-    async searchSoldItems(keyword, categoryId = null) {
+    // Estimates market price from current eBay.de listings via the Browse API.
+    // Replaces the Finding API (findCompletedItems), which eBay decommissioned
+    // (it now returns HTTP 418). Browse returns *active* asking prices rather
+    // than completed-sale prices, so ACTIVE_TO_SOLD_FACTOR nudges the estimate
+    // down toward realistic selling prices. Works on the app (client_credentials)
+    // token — no special approval, unlike the Marketplace Insights API.
+    async searchSoldItems(keyword, categoryId = null, conditionId = 3000) {
         if (!keyword) return null;
+        const ACTIVE_TO_SOLD_FACTOR = 0.9;
         try {
-            // GLOBAL-ID=EBAY-DE forces the German site so prices come back in EUR
-            // (default is EBAY-US → USD, which was silently treated as EUR).
-            let url = `https://svcs.ebay.com/services/search/FindingService/v1?OPERATION-NAME=findCompletedItems&SERVICE-VERSION=1.7.0&SECURITY-APPNAME=${this.appId}&GLOBAL-ID=EBAY-DE&RESPONSE-DATA-FORMAT=JSON&REST-PAYLOAD&keywords=${encodeURIComponent(keyword)}&itemFilter(0).name=Condition&itemFilter(0).value=3000&itemFilter(1).name=SoldItemsOnly&itemFilter(1).value=true&itemFilter(2).name=ListingType&itemFilter(2).value=FixedPrice&itemFilter(3).name=ListingType&itemFilter(3).value=AuctionWithBIN&itemFilter(4).name=ListingType&itemFilter(4).value=Auction&paginationInput.entriesPerPage=100&sortOrder=EndTimeSoonest`;
-            if (categoryId) {
-                url += `&categoryId=${encodeURIComponent(categoryId)}`;
-            }
-            const response = await axios.get(url);
+            const token = await this.getAppToken();
+            const params = new URLSearchParams({
+                q: keyword,
+                limit: '100',
+                filter: `conditionIds:{${conditionId}},price:[1..],priceCurrency:EUR`,
+            });
+            if (categoryId) params.set('category_ids', String(categoryId));
+
+            const response = await axios.get(
+                `https://${EBAY_API_SERVER}/buy/browse/v1/item_summary/search?${params.toString()}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_DE',
+                    },
+                }
+            );
 
             const data = response.data;
-            if (data.findCompletedItemsResponse && data.findCompletedItemsResponse[0] && data.findCompletedItemsResponse[0].searchResult && data.findCompletedItemsResponse[0].searchResult[0]) {
-                const items = data.findCompletedItemsResponse[0].searchResult[0].item;
+            {
+                const items = data && data.itemSummaries;
                 if (items && items.length > 0) {
                     // Collect only EUR prices — ignore any stray non-EUR currency.
                     let prices = [];
                     for (const item of items) {
-                        const cp = item.sellingStatus && item.sellingStatus[0] && item.sellingStatus[0].currentPrice && item.sellingStatus[0].currentPrice[0];
+                        const cp = item.price;
                         if (!cp) continue;
-                        const currency = cp["@currencyId"];
-                        if (currency && currency !== "EUR") continue;
-                        const price = parseFloat(cp.__value__);
+                        if (cp.currency && cp.currency !== "EUR") continue;
+                        const price = parseFloat(cp.value);
                         if (!isNaN(price) && price > 0) {
                             prices.push(price);
                         }
@@ -339,11 +355,18 @@ class EbayAPI {
                     const average = core.reduce((s, p) => s + p, 0) / core.length;
                     const max = core[core.length - 1];
 
-                    return { average, median, max, count: core.length };
+                    // Discount active asking prices toward realistic sold prices.
+                    return {
+                        average: average * ACTIVE_TO_SOLD_FACTOR,
+                        median: median * ACTIVE_TO_SOLD_FACTOR,
+                        max: max * ACTIVE_TO_SOLD_FACTOR,
+                        count: core.length,
+                    };
                 }
             }
         } catch (e) {
-            console.error("Failed to fetch sold items:", e.message);
+            const detail = e.response && e.response.data ? JSON.stringify(e.response.data).slice(0, 500) : e.message;
+            console.error("Failed to fetch market prices (Browse API):", detail);
         }
         return null;
     }
@@ -372,7 +395,7 @@ class EbayAPI {
         // marketPrice = realistic price the item actually sells for on eBay.de.
         // Prefer the median of real sold listings; fall back to the AI estimate.
         let marketPrice;
-        const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title, categoryId);
+        const soldPrices = await this.searchSoldItems(chatgptData.search_keyword || chatgptData.title, categoryId, conditionID);
         if (soldPrices && soldPrices.count > 0) {
             marketPrice = soldPrices.median;
             // If we have an AI estimate, keep the sold-data median from drifting
