@@ -223,7 +223,21 @@ class EbayAPI {
             'X-EBAY-API-IAF-TOKEN': token
         };
 
-        const res = await axios.post('https://api.ebay.com/ws/api.dll', form, { headers });
+        let res;
+        try {
+            res = await axios.post('https://api.ebay.com/ws/api.dll', form, {
+                headers,
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
+        } catch (err) {
+            // Surface eBay's real explanation instead of just "status code 404"
+            const status = err.response ? err.response.status : 'no-response';
+            const body = err.response && err.response.data ? String(err.response.data).slice(0, 2000) : '(empty body)';
+            const respHeaders = err.response ? JSON.stringify(err.response.headers) : '{}';
+            console.error(`[UploadSiteHostedPictures] HTTP ${status} for ${filename}\n  body: ${body}\n  resp-headers: ${respHeaders}`);
+            throw err;
+        }
         const parsed = await xml2js.parseStringPromise(res.data, { explicitArray: false });
         const root = parsed['UploadSiteHostedPicturesResponse'];
 
